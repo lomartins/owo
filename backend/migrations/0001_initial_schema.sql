@@ -1,8 +1,25 @@
--- Core owo schema
--- Financial data tables with strong integrity constraints
--- Run after init.sql (Docker handles ordering via /docker-entrypoint-initdb.d/)
+-- Migration 0001: Initial schema
+-- Mirrors the Docker initialization scripts using IF NOT EXISTS so it is safe
+-- to run against a database that was already bootstrapped by Docker.
 
-SET timezone = 'UTC';
+-- Extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ============================================================
+-- Users (base table — all other tables reference this)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+    id            BIGSERIAL    PRIMARY KEY,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name     VARCHAR(255),
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- ============================================================
 -- Accounts
@@ -23,8 +40,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     UNIQUE(user_id, name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_accounts_user_active ON accounts(user_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_accounts_external_id ON accounts(external_account_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_user_active   ON accounts(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_accounts_external_id   ON accounts(external_account_id);
 
 -- ============================================================
 -- Transaction categories
@@ -119,11 +136,3 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_user ON sync_conflicts(user_id);
-
--- Grant permissions to all newly created objects
-GRANT ALL PRIVILEGES ON ALL TABLES    IN SCHEMA public TO owo;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO owo;
-
-DO $$ BEGIN
-    RAISE NOTICE 'Schema created successfully';
-END $$;
