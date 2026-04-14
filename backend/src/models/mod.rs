@@ -24,44 +24,24 @@ pub struct PaginatedResponse<T: Serialize> {
     pub per_page: i64,
 }
 
-// ============================================================================
-// USER TASK 3.1 — User model  (Easy)
-//
-// Write two structs below: `User` and `CreateUserRequest`.
-//
-// Helpful imports already available in this file:
-//   use serde::{Deserialize, Serialize};   ← already at the top
-// You will also need to reference these types by their full path:
-//   chrono::DateTime<chrono::Utc>
-//   sqlx::FromRow  (used as a derive, no use statement needed)
-//
-// ── User ────────────────────────────────────────────────────────────────────
-// Maps to the `users` table. Required derives:
-//   #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-//
-// Fields:
-//   pub id:            i64
-//   pub email:         String
-//   pub password_hash: String   ← add #[serde(skip_serializing)] above this field
-//                                  so it is NEVER included in JSON responses
-//   pub full_name:     Option<String>
-//   pub is_active:     bool
-//   pub created_at:    chrono::DateTime<chrono::Utc>
-//   pub updated_at:    chrono::DateTime<chrono::Utc>
-//
-// ── CreateUserRequest ────────────────────────────────────────────────────────
-// JSON body received by POST /api/v1/users. Required derives:
-//   #[derive(Debug, Deserialize)]
-//
-// Fields:
-//   pub email:     String
-//   pub password:  String
-//   pub full_name: Option<String>
-//
-// Run `cargo check` when done — it should compile with zero errors.
-// ============================================================================
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct User {
+    pub id: i64,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub full_name: String,
+    pub is_active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
 
-// ← Your structs go here (Task 3.1)
+#[derive(Debug, Deserialize)]
+pub struct CreateUserRequest {
+    pub email: String,
+    pub password: String,
+    pub full_name: Option<String>,
+}
 
 // ============================================================================
 // USER TASK 3.2 — Account model  (Easy)
