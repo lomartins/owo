@@ -73,7 +73,9 @@ backend-run:
 	cd backend && cargo run
 
 backend-test:
-	cd backend && cargo test
+	cd backend && set -a && [ -f ../.env ] && . ../.env; set +a && \
+		DATABASE_URL="postgres://$${DB_USER:-owo}:$${DB_PASSWORD:-owo_dev_password}@$${DB_HOST:-localhost}:$${DB_PORT:-5432}/$${DB_NAME:-owo_dev}" \
+		cargo test
 
 backend-check:
 	cd backend && cargo clippy --all-targets && cargo fmt --check

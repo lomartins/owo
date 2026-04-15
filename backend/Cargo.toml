@@ -43,10 +43,21 @@ tower-http = { version = "0.5", features = ["trace", "cors"] }
 # Error handling
 anyhow = "1"
 
-# Password hashing (TODO: replace with argon2 before production)
-sha2 = "0.10"
-hex = "0.4"
+# Password hashing
+argon2 = "0.5"
+
+# Random generation
+rand = "0.9"
 
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = [
+    "postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "migrate",
+    "uuid",
+    "chrono",
+    "rust_decimal",
+] }
