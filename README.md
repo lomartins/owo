@@ -1,6 +1,6 @@
 # owo - Personal Finance Management
 
-**owo** ("money" in Yoruba) is an open, expansible, and reliable personal finance management system. Track, analyze, and automate your financial life with ease.
+**owo** (owó, "money" in Yoruba) is an open, expansible, and reliable personal finance management system. Track, analyze, and automate your financial life with ease.
 
 ## Features
 
