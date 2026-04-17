@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.svg" width="120" alt="owo logo — sete búzios" />
+</p>
+
 # owo - Personal Finance Management
 
 **owo** (owó, "money" in Yoruba) is an open, expansible, and reliable personal finance management system. Track, analyze, and automate your financial life with ease.
