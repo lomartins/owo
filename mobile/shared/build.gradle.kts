@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.lint)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.jetbrains.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -72,12 +73,14 @@ kotlin {
                 implementation(project(":feature:transactions:impl"))
                 implementation(project(":core:database"))
                 implementation(project(":core:ui"))
+                implementation(project(":core:navigation:impl"))
 
                 implementation(libs.kotlin.stdlib)
                 implementation(libs.bundles.compose.multiplatform)
                 implementation(libs.compose.components.resources)
                 implementation(libs.navigation.compose)
                 implementation(libs.compose.ui.tooling.preview)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
 
