@@ -21,7 +21,7 @@ kotlin {
             api(project(":core:navigation:api"))
             implementation(libs.navigation.compose)
             implementation(libs.koin.core)
-            implementation(libs.bundles.compose.multiplatform)
+            api(libs.bundles.compose.multiplatform)
         }
     }
 }

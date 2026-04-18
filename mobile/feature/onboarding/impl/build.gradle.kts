@@ -21,8 +21,10 @@ kotlin {
             api(project(":feature:onboarding:api"))
             implementation(project(":core:domain"))
             implementation(project(":core:ui"))
+            implementation(project(":core:navigation:api"))
             implementation(libs.koin.core)
             implementation(libs.bundles.compose.multiplatform)
+            implementation(libs.navigation.compose)
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
