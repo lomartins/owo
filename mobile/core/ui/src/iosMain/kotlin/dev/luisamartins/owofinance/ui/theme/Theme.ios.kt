@@ -8,5 +8,5 @@ actual fun determineColorScheme(
     darkTheme: Boolean,
     dynamicColor: Boolean
 ): ColorScheme {
-    return if (darkTheme) DarkColorScheme else LightColorScheme
+    return LightColorScheme
 }
