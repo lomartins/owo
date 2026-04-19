@@ -72,7 +72,9 @@ kotlin {
                 implementation(project(":feature:cards:impl"))
                 implementation(project(":feature:transactions:impl"))
                 implementation(project(":core:database"))
+                implementation(project(":core:domain"))
                 implementation(project(":core:ui"))
+                implementation(project(":core:navigation:api"))
                 implementation(project(":core:navigation:impl"))
 
                 implementation(libs.kotlin.stdlib)
@@ -81,6 +83,8 @@ kotlin {
                 implementation(libs.navigation.compose)
                 implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
             }
         }
 
@@ -92,6 +96,7 @@ kotlin {
 
         androidMain {
             dependencies {
+                implementation(libs.koin.android)
             }
         }
 

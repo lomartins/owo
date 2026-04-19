@@ -11,31 +11,34 @@ import androidx.navigation.compose.rememberNavController
 import dev.luisamartins.owofinance.core.navigation.api.NavGraphContributor
 import dev.luisamartins.owofinance.core.navigation.api.NavigateBack
 import dev.luisamartins.owofinance.core.navigation.api.Navigator
-import dev.luisamartins.owofinance.core.navigation.impl.NavigatorImpl
 import dev.luisamartins.owofinance.onboarding.api.navigation.destinations.WelcomeDestination
-import dev.luisamartins.owofinance.onboarding.impl.navigation.OnboardingNavGraphContributor
 import dev.luisamartins.owofinance.ui.theme.OwoFinanceTheme
+import org.koin.compose.getKoin
+import org.koin.compose.koinInject
 
 @Composable
 fun OwoFinanceApp() {
     val navController = rememberNavController()
-    val navigator: Navigator = remember { NavigatorImpl() } // TODO implement DI
-    val contributors: List<NavGraphContributor> = remember { listOf(OnboardingNavGraphContributor()) }
+    val navigator: Navigator = koinInject()
+    val koin = getKoin()
+    val contributors: List<NavGraphContributor> =
+        remember { koin.getAll<NavGraphContributor>() }
 
     LaunchedEffect(Unit) {
         navigator.navigationEvents.collect { destination ->
             when (destination) {
                 is NavigateBack -> navController.popBackStack()
-                else -> navController.navigate(destination)   // type-safe overload, event is @Serializable
+                else -> navController.navigate(destination)
             }
         }
     }
 
     OwoFinanceTheme {
-        Scaffold(bottomBar = {  }) { padding ->
-            NavHost(navController, startDestination = WelcomeDestination, Modifier.padding(padding)) {
-                contributors.forEach { with(it) { contribute(navController) } }
-            }
+        NavHost(
+            navController,
+            startDestination = WelcomeDestination,
+        ) {
+            contributors.forEach { with(it) { contribute(navController) } }
         }
     }
 }

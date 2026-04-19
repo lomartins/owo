@@ -21,12 +21,16 @@ kotlin {
             api(project(":feature:transactions:api"))
             implementation(project(":core:domain"))
             implementation(project(":core:ui"))
+            implementation(project(":core:navigation:api"))
             implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+            implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.bundles.compose.multiplatform)
+            implementation(libs.navigation.compose)
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
-            implementation(libs.koin.compose)
         }
     }
 }

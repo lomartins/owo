@@ -1,4 +1,4 @@
-package dev.luisamartins.owofinance.onboarding.impl.ui
+package dev.luisamartins.owofinance.onboarding.impl.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -98,7 +98,6 @@ private fun WelcomeContent(
                 )
             }
 
-            // TODO: Phase 2
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
