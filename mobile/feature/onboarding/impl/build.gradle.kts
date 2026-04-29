@@ -27,10 +27,15 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.bundles.compose.multiplatform)
+            implementation(libs.navigation.event)
             implementation(libs.navigation.compose)
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
         }
     }
+}
+
+dependencies {
+    androidRuntimeClasspath(libs.compose.ui.tooling)
 }

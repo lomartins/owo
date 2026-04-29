@@ -24,6 +24,7 @@ core = "1.5.0"
 
 [libraries]
 compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
 compose-ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "compose-multiplatform" }
 compose-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "compose-multiplatform" }
 compose-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "compose-multiplatform" }
@@ -31,6 +32,9 @@ compose-material3 = { group = "org.jetbrains.compose.material3", name = "materia
 compose-material-icons-core = { group = "org.jetbrains.compose.material", name = "material-icons-core", version = "1.7.3" }
 compose-components-resources = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose-multiplatform" }
 navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version = "2.9.2" }
+navigation-event = { group = "org.jetbrains.androidx.navigationevent", name = "navigationevent-compose", version = "1.0.1" }
+
+
 
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -76,4 +80,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 android-lint = { id = "com.android.lint", version.ref = "agp" }
 
 [bundles]
-compose-multiplatform = ["compose-ui", "compose-foundation", "compose-runtime", "compose-material3", "compose-material-icons-core"]
+compose-multiplatform = ["compose-ui", "compose-foundation", "compose-runtime", "compose-material3", "compose-material-icons-core", "compose-ui-tooling-preview", "navigation-event"]

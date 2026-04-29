@@ -1,5 +1,9 @@
 package dev.luisamartins.owofinance.shared
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -37,6 +41,8 @@ fun OwoFinanceApp() {
         NavHost(
             navController,
             startDestination = WelcomeDestination,
+            enterTransition = { slideInHorizontally { it } + fadeIn() },
+            exitTransition = { slideOutHorizontally { -it } + fadeOut() },
         ) {
             contributors.forEach { with(it) { contribute(navController) } }
         }
