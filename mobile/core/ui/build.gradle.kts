@@ -27,4 +27,13 @@ kotlin {
             implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
         }
     }
+
+    android {
+        androidResources.enable = true
+    }
+}
+
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "dev.luisamartins.owofinance.core.ui"
 }

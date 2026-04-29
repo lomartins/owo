@@ -1,5 +1,6 @@
 package dev.luisamartins.owofinance.onboarding.impl.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.luisamartins.owofinance.ui.assets.OwoDrawable
+import dev.luisamartins.owofinance.ui.assets.logo
+import dev.luisamartins.owofinance.ui.assets.toPainter
 
 @Composable
 fun WelcomeScreen(
@@ -51,7 +55,9 @@ private fun WelcomeContent(
                 .size(80.dp)
                 .clip(RoundedCornerShape(7.dp))
                 .background(colors.surface)
-        )
+        ) {
+            Image(painter = OwoDrawable.logo.toPainter(), contentDescription = "")
+        }
 
         Spacer(Modifier.height(10.dp))
 
