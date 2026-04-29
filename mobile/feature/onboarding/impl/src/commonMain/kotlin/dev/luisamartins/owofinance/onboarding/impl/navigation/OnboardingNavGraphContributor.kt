@@ -8,6 +8,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import dev.luisamartins.owofinance.core.navigation.api.NavGraphContributor
+import dev.luisamartins.owofinance.dashboard.api.navigation.destinations.DashboardDestination
 import dev.luisamartins.owofinance.onboarding.api.navigation.destinations.OnboardingDestination
 import dev.luisamartins.owofinance.onboarding.api.navigation.destinations.WelcomeDestination
 import dev.luisamartins.owofinance.onboarding.impl.presentation.OnboardingScreen
@@ -30,7 +31,7 @@ class OnboardingNavGraphContributor : NavGraphContributor {
         ) {
             OnboardingScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onFinish = { /* TODO Navigate to Dashboard */ },
+                onFinish = { navController.navigate(DashboardDestination) },
             )
         }
     }
