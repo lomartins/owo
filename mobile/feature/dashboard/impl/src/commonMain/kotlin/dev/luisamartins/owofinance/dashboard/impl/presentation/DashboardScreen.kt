@@ -29,14 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.luisamartins.owofinance.domain.model.Account
+import dev.luisamartins.owofinance.domain.model.AccountType
 import dev.luisamartins.owofinance.domain.model.Card
 import dev.luisamartins.owofinance.domain.model.Transaction
 import dev.luisamartins.owofinance.ui.components.BottomNavTab
 import dev.luisamartins.owofinance.ui.components.OwoBottomBar
 import dev.luisamartins.owofinance.ui.util.formatCurrency
+import kotlinx.datetime.LocalDate
 
 @Composable
 fun DashboardScreen(
@@ -193,7 +196,8 @@ private fun AccountCard(account: Account) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(colors.primaryContainer),
+                    modifier = Modifier.size(36.dp).clip(CircleShape)
+                        .background(colors.primaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -204,9 +208,19 @@ private fun AccountCard(account: Account) {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(text = account.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                Text(
+                    text = account.name,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurface
+                )
             }
-            Text(text = account.balance.formatCurrency(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+            Text(
+                text = account.balance.formatCurrency(),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurface
+            )
         }
     }
 }
@@ -226,7 +240,8 @@ private fun CreditCardRow(card: Card, onClick: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(colors.secondaryContainer),
+                    modifier = Modifier.size(36.dp).clip(CircleShape)
+                        .background(colors.secondaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -238,8 +253,17 @@ private fun CreditCardRow(card: Card, onClick: () -> Unit) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(text = card.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
-                    Text(text = "•••• ${card.lastFourDigits}", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                    Text(
+                        text = card.name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.onSurface
+                    )
+                    Text(
+                        text = "•••• ${card.lastFourDigits}",
+                        fontSize = 12.sp,
+                        color = colors.onSurfaceVariant
+                    )
                 }
             }
             Text(text = "Due ${card.dueDay}", fontSize = 12.sp, color = colors.onSurfaceVariant)
@@ -277,8 +301,17 @@ private fun TransactionRow(transaction: Transaction) {
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(text = transaction.description, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
-                Text(text = transaction.date.toString(), fontSize = 12.sp, color = colors.onSurfaceVariant)
+                Text(
+                    text = transaction.description,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = transaction.date.toString(),
+                    fontSize = 12.sp,
+                    color = colors.onSurfaceVariant
+                )
             }
         }
         Text(
@@ -288,4 +321,77 @@ private fun TransactionRow(transaction: Transaction) {
             color = if (isIncome) colors.primary else colors.error,
         )
     }
+}
+
+@Preview
+@Composable
+private fun DashboardPreview() {
+    val mockState = DashboardUiState(
+        totalBalance = 525050,
+        accounts = listOf(
+            Account(
+                id = "1",
+                name = "Checking",
+                balance = 250000,
+                type = AccountType.DEBIT,
+            ),
+            Account(
+                id = "2",
+                name = "Savings",
+                balance = 275050,
+                type = AccountType.DEBIT,
+            )
+        ),
+        cards = listOf(
+            Card(
+                id = "card1",
+                name = "Mastercard",
+                lastFourDigits = "4242",
+                limit = 500000,
+                dueDay = 15,
+                closingDay = 5,
+                accountId = "1"
+            )
+        ),
+        recentTransactions = listOf(
+            Transaction(
+                id = "tx1",
+                description = "Groceries",
+                amount = -4599,
+                date = LocalDate(2026, 4, 27),
+                categoryId = "cat1",
+                accountId = "1",
+                cardId = "card1",
+                installmentGroupId = null
+            ),
+            Transaction(
+                id = "tx2",
+                description = "Salary",
+                amount = 500000,
+                date = LocalDate(2026, 4, 25),
+                categoryId = "cat2",
+                accountId = "1",
+                cardId = null,
+                installmentGroupId = null
+            ),
+            Transaction(
+                id = "tx3",
+                description = "Electricity bill",
+                amount = -12000,
+                date = LocalDate(2026, 4, 20),
+                categoryId = "cat3",
+                accountId = "1",
+                cardId = null,
+                installmentGroupId = null
+            )
+        )
+    )
+
+    DashboardContent(
+        state = mockState,
+        onNavigateToTransactions = {},
+        onNavigateToAccounts = {},
+        onNavigateToAllTransactions = {},
+        onNavigateToCardBill = {}
+    )
 }
