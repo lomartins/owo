@@ -1,4 +1,4 @@
-package dev.luisamartins.owofinance.dashboard.impl.presentation
+package dev.luisamartins.owofinance.accounts.impl.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,8 +17,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,50 +37,61 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.luisamartins.owofinance.domain.model.Account
 import dev.luisamartins.owofinance.domain.model.Card
-import dev.luisamartins.owofinance.domain.model.Transaction
 import dev.luisamartins.owofinance.ui.components.BottomNavTab
 import dev.luisamartins.owofinance.ui.components.OwoBottomBar
 import dev.luisamartins.owofinance.ui.util.formatCurrency
 
 @Composable
-fun DashboardScreen(
-    viewModel: DashboardViewModel,
+fun AccountsScreen(
+    viewModel: AccountsViewModel,
+    onNavigateToDashboard: () -> Unit,
     onNavigateToTransactions: () -> Unit,
-    onNavigateToAccounts: () -> Unit,
-    onNavigateToAllTransactions: () -> Unit,
+    onAddAccount: () -> Unit,
+    onAddCard: () -> Unit,
     onNavigateToCardBill: (String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
-    DashboardContent(
+    AccountsContent(
         state = state,
+        onNavigateToDashboard = onNavigateToDashboard,
         onNavigateToTransactions = onNavigateToTransactions,
-        onNavigateToAccounts = onNavigateToAccounts,
-        onNavigateToAllTransactions = onNavigateToAllTransactions,
+        onAddAccount = onAddAccount,
+        onAddCard = onAddCard,
         onNavigateToCardBill = onNavigateToCardBill,
     )
 }
 
 @Composable
-private fun DashboardContent(
-    state: DashboardUiState,
+private fun AccountsContent(
+    state: AccountsUiState,
+    onNavigateToDashboard: () -> Unit,
     onNavigateToTransactions: () -> Unit,
-    onNavigateToAccounts: () -> Unit,
-    onNavigateToAllTransactions: () -> Unit,
+    onAddAccount: () -> Unit,
+    onAddCard: () -> Unit,
     onNavigateToCardBill: (String) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
         bottomBar = {
             OwoBottomBar(
-                selectedTab = BottomNavTab.DASHBOARD,
+                selectedTab = BottomNavTab.ACCOUNTS,
                 onTabSelected = { tab ->
                     when (tab) {
+                        BottomNavTab.DASHBOARD -> onNavigateToDashboard()
                         BottomNavTab.TRANSACTIONS -> onNavigateToTransactions()
-                        BottomNavTab.ACCOUNTS -> onNavigateToAccounts()
                         else -> Unit
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddAccount,
+                containerColor = colors.primary,
+                contentColor = colors.onPrimary,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add account")
+            }
         },
         containerColor = colors.background,
     ) { innerPadding ->
@@ -86,100 +101,57 @@ private fun DashboardContent(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Dashboard",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onBackground,
-                )
-            }
+            Text(
+                text = "Accounts",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onBackground,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
 
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                Text(text = "Total balance", fontSize = 13.sp, color = colors.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = state.totalBalance.formatCurrency(),
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onBackground,
-                    letterSpacing = (-0.5).sp,
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            SectionHeader(title = "Debit accounts", onSeeAll = onNavigateToAccounts)
+            Text(
+                text = "Debit accounts",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurfaceVariant,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                state.accounts.forEach { AccountCard(account = it) }
+                state.accounts.forEach { AccountItem(account = it) }
             }
 
-            Spacer(Modifier.height(24.dp))
-
             if (state.cards.isNotEmpty()) {
-                SectionHeader(title = "Credit cards", onSeeAll = onNavigateToAccounts)
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = "Credit cards",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurfaceVariant,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
                 Spacer(Modifier.height(8.dp))
                 Column(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     state.cards.forEach { card ->
-                        CreditCardRow(card = card, onClick = { onNavigateToCardBill(card.id) })
+                        CardItem(card = card, onClick = { onNavigateToCardBill(card.id) })
                     }
                 }
-                Spacer(Modifier.height(24.dp))
             }
-
-            SectionHeader(title = "Recent transactions", onSeeAll = onNavigateToAllTransactions)
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                state.recentTransactions.forEach { TransactionRow(transaction = it) }
-            }
-
             Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String, onSeeAll: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.onSurfaceVariant,
-            letterSpacing = 0.5.sp,
-        )
-        Text(
-            text = "See all",
-            fontSize = 13.sp,
-            color = colors.primary,
-            modifier = Modifier.clickable { onSeeAll() },
-        )
-    }
-}
-
-@Composable
-private fun AccountCard(account: Account) {
+private fun AccountItem(account: Account) {
     val colors = MaterialTheme.colorScheme
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -204,7 +176,10 @@ private fun AccountCard(account: Account) {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(text = account.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                Column {
+                    Text(text = account.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
+                    Text(text = "Checking", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                }
             }
             Text(text = account.balance.formatCurrency(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
         }
@@ -212,7 +187,7 @@ private fun AccountCard(account: Account) {
 }
 
 @Composable
-private fun CreditCardRow(card: Card, onClick: () -> Unit) {
+private fun CardItem(card: Card, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
@@ -239,53 +214,10 @@ private fun CreditCardRow(card: Card, onClick: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(text = card.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
-                    Text(text = "•••• ${card.lastFourDigits}", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                    Text(text = "•••• ${card.lastFourDigits}  ·  due ${card.dueDay}", fontSize = 12.sp, color = colors.onSurfaceVariant)
                 }
             }
-            Text(text = "Due ${card.dueDay}", fontSize = 12.sp, color = colors.onSurfaceVariant)
+            Text(text = "Limit\n${card.limit.formatCurrency()}", fontSize = 12.sp, color = colors.onSurfaceVariant)
         }
-    }
-}
-
-@Composable
-private fun TransactionRow(transaction: Transaction) {
-    val colors = MaterialTheme.colorScheme
-    val isIncome = transaction.amount > 0
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(colors.surface)
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isIncome) colors.primaryContainer else colors.errorContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = transaction.description.first().uppercaseChar().toString(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isIncome) colors.onPrimaryContainer else colors.onErrorContainer,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(text = transaction.description, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.onSurface)
-                Text(text = transaction.date.toString(), fontSize = 12.sp, color = colors.onSurfaceVariant)
-            }
-        }
-        Text(
-            text = if (isIncome) "+${transaction.amount.formatCurrency()}" else transaction.amount.formatCurrency(),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isIncome) colors.primary else colors.error,
-        )
     }
 }

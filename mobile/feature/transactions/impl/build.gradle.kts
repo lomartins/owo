@@ -19,6 +19,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":feature:transactions:api"))
+            implementation(project(":feature:dashboard:api"))
+            implementation(project(":feature:accounts:api"))
             implementation(project(":core:domain"))
             implementation(project(":core:ui"))
             implementation(project(":core:navigation:api"))
@@ -26,6 +28,7 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.androidx.lifecycle.viewmodel)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.bundles.compose.multiplatform)
             implementation(libs.navigation.compose)
         }

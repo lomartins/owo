@@ -19,6 +19,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":feature:accounts:api"))
+            implementation(project(":feature:dashboard:api"))
+            implementation(project(":feature:transactions:api"))
+            implementation(project(":feature:cards:api"))
             implementation(project(":core:domain"))
             implementation(project(":core:ui"))
             implementation(project(":core:navigation:api"))

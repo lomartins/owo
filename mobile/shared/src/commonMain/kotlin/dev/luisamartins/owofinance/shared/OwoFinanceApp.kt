@@ -41,8 +41,6 @@ fun OwoFinanceApp() {
         NavHost(
             navController,
             startDestination = WelcomeDestination,
-            enterTransition = { slideInHorizontally { it } + fadeIn() },
-            exitTransition = { slideOutHorizontally { -it } + fadeOut() },
         ) {
             contributors.forEach { with(it) { contribute(navController) } }
         }

@@ -26,6 +26,7 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.androidx.lifecycle.viewmodel)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.bundles.compose.multiplatform)
             implementation(libs.navigation.compose)
         }
