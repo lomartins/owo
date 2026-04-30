@@ -45,18 +45,6 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsState()
     val colors = MaterialTheme.colorScheme
     Scaffold(
-        bottomBar = {
-            OwoBottomBar(
-                selectedTab = BottomNavTab.TRANSACTIONS,
-                onTabSelected = { tab ->
-                    when (tab) {
-                        BottomNavTab.DASHBOARD -> onNavigateToDashboard()
-                        BottomNavTab.ACCOUNTS -> onNavigateToAccounts()
-                        else -> Unit
-                    }
-                },
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddTransaction,

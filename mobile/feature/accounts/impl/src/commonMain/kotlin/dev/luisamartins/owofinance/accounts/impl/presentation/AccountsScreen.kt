@@ -72,18 +72,6 @@ private fun AccountsContent(
 ) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
-        bottomBar = {
-            OwoBottomBar(
-                selectedTab = BottomNavTab.ACCOUNTS,
-                onTabSelected = { tab ->
-                    when (tab) {
-                        BottomNavTab.DASHBOARD -> onNavigateToDashboard()
-                        BottomNavTab.TRANSACTIONS -> onNavigateToTransactions()
-                        else -> Unit
-                    }
-                },
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddAccount,

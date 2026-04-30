@@ -69,18 +69,6 @@ private fun DashboardContent(
 ) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
-        bottomBar = {
-            OwoBottomBar(
-                selectedTab = BottomNavTab.DASHBOARD,
-                onTabSelected = { tab ->
-                    when (tab) {
-                        BottomNavTab.TRANSACTIONS -> onNavigateToTransactions()
-                        BottomNavTab.ACCOUNTS -> onNavigateToAccounts()
-                        else -> Unit
-                    }
-                },
-            )
-        },
         containerColor = colors.background,
     ) { innerPadding ->
         Column(
