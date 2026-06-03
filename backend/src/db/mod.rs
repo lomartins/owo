@@ -1,17 +1,19 @@
-use anyhow::Context;
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use anyhow::{Context, Result};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::SqlitePool;
+use std::str::FromStr;
 
-/// Creates and returns a PostgreSQL connection pool.
-///
-/// Reads `DATABASE_URL` from the environment (loaded from `.env` by main).
-/// Returns an error if the variable is missing or the connection fails.
-pub async fn create_pool() -> anyhow::Result<PgPool> {
-    let database_url = std::env::var("DATABASE_URL")
-        .context("DATABASE_URL environment variable is not set")?;
+pub async fn pool(url: &str) -> Result<SqlitePool> {
+    let opts = SqliteConnectOptions::from_str(url)
+        .with_context(|| format!("invalid sqlite url: {url}"))?
+        .create_if_missing(true)
+        .foreign_keys(true)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
-    PgPoolOptions::new()
+    let pool = SqlitePoolOptions::new()
         .max_connections(10)
-        .connect(&database_url)
+        .connect_with(opts)
         .await
-        .context("Failed to connect to PostgreSQL")
+        .with_context(|| format!("failed to connect to {url}"))?;
+    Ok(pool)
 }

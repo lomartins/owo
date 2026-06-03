@@ -4,6 +4,19 @@ Cargo.lock
 **/*.rs.bk
 *.pdb
 
+# owo runtime
+owo.db
+owo.db-wal
+owo.db-shm
+uploads/
+
+# AI tool caches
+.cc-history/
+.gemini/
+.omc/
+backend/.omc/
+.claude/
+
 # Kotlin/Gradle
 .gradle/
 build/

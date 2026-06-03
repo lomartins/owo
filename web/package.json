@@ -1,0 +1,32 @@
+{
+  "name": "owo-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@solid-primitives/i18n": "^2.2.1",
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.5"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "@tailwindcss/vite": "^4.1.7",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitest/ui": "^4.1.7",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.6.3",
+    "vite": "^6.3.5",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.7"
+  }
+}

@@ -1,12 +1,14 @@
-//! owo backend library
-//!
-//! Core API, financial calculations, data processing, and Open Finance integration
+//! owo — personal finance backend.
 
 pub mod api;
+pub mod audit;
+pub mod auth_middleware;
+pub mod config;
 pub mod db;
-pub mod integrations;
-pub mod models;
+pub mod domain;
+pub mod error;
+pub mod ids;
+pub mod pagination;
+pub mod server;
 pub mod services;
-
-#[cfg(test)]
-mod tests;
+pub mod state;
