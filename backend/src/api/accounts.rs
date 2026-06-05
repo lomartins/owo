@@ -14,13 +14,15 @@ pub struct AccountList {
     pub items: Vec<Account>,
 }
 
-/// Balance = initial_balance + sum(incoming) - sum(outgoing).
+/// Balance = initial_balance + sum(incoming) - sum(outgoing), counted only up to
+/// today. Future-dated transactions (e.g. an installment due next month) are
+/// "scheduled", not yet posted, so they don't affect the current balance.
 /// Subqueries are filtered on (source|destination)_account_id matching the row's id.
 /// initial_balance is now always 0 (opening value lives in a transaction), but it
 /// is kept in the formula for forward-compatibility.
 const BALANCE_EXPR: &str = "a.initial_balance \
-    + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL), 0) \
-    - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL), 0)";
+    + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL AND tx_date <= date('now')), 0) \
+    - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL AND tx_date <= date('now')), 0)";
 
 /// Signed value of the account's opening-balance transaction (the leg paired with
 /// the user's equity bucket). Positive = money started in the account.

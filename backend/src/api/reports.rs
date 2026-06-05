@@ -211,11 +211,13 @@ pub async fn spendable(
         return Err(ApiError::Validation { field: "month".into(), reason: "expected YYYY-MM".into() });
     }
     let uid = cu.id.to_string();
-    let far = "9999-12-31";
+    // "As of today": balances_for_types_at filters tx_date < bound, so pass tomorrow
+    // to include everything dated up to and including today (future-dated tx excluded).
+    let today_excl = (chrono::Utc::now().date_naive() + chrono::Days::new(1)).to_string();
 
-    let asset_total = balances_for_types_at(&state.pool, &uid, &["asset"], far).await?;
+    let asset_total = balances_for_types_at(&state.pool, &uid, &["asset"], &today_excl).await?;
     // credit_card/liability balance is negative when in debt; outstanding is its magnitude.
-    let liab_balance = balances_for_types_at(&state.pool, &uid, &["credit_card", "liability"], far).await?;
+    let liab_balance = balances_for_types_at(&state.pool, &uid, &["credit_card", "liability"], &today_excl).await?;
     let card_outstanding = (-liab_balance).max(0);
 
     let (pending_bills,): (i64,) = sqlx::query_as(
@@ -318,12 +320,17 @@ pub async fn net_worth(
         .collect();
     months_list.dedup();
 
+    // "As of today" for the current point: cap each month's exclusive boundary at
+    // tomorrow so the latest month reflects today (future-dated tx excluded), while
+    // past months keep their month-end snapshot.
+    let today_excl = (chrono::Utc::now().date_naive() + chrono::Days::new(1)).to_string();
     let mut points: Vec<NetWorthPoint> = Vec::with_capacity(months_list.len());
     for m in &months_list {
         let next = shift_month(m, 1);
         let lo_next = format!("{}-01", next); // exclusive boundary = start of next month
-        let assets = balances_for_types_at(&state.pool, &cu.id.to_string(), &["asset"], &lo_next).await?;
-        let liab = balances_for_types_at(&state.pool, &cu.id.to_string(), &["credit_card", "liability"], &lo_next).await?;
+        let bound = if lo_next < today_excl { lo_next } else { today_excl.clone() };
+        let assets = balances_for_types_at(&state.pool, &cu.id.to_string(), &["asset"], &bound).await?;
+        let liab = balances_for_types_at(&state.pool, &cu.id.to_string(), &["credit_card", "liability"], &bound).await?;
         let nw = assets - liab;
         points.push(NetWorthPoint { month: m.clone(), net_worth: nw });
     }
