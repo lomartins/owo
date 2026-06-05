@@ -156,6 +156,7 @@ export const pt: Dict = {
     cardLabel: "Cartão",
     installments: "Parcelas",
     installmentsHint: "Divide a compra em cobranças mensais, uma por fatura.",
+    lockedCredit: "Fixo em Crédito para compras no cartão",
   },
   budgets: {
     title: "Estimativa por categoria",

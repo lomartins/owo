@@ -154,6 +154,7 @@ export const en = {
     cardLabel: "Card",
     installments: "Installments",
     installmentsHint: "Splits the purchase into monthly charges, one per upcoming invoice.",
+    lockedCredit: "Locked to Credit for card purchases",
   },
   budgets: {
     title: "Estimate per category",

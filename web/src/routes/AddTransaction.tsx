@@ -350,22 +350,35 @@ export default function AddTransaction(): JSX.Element {
 
         <section>
           <span class="label">{t("addTransaction.paymentMethod")}</span>
-          <div class="flex flex-wrap gap-2">
-            <For each={PAYMENT_METHODS}>
-              {(p) => (
-                <button
-                  type="button"
-                  class="chip-select"
-                  aria-pressed={method() === p.value}
-                  classList={{ "is-active": method() === p.value }}
-                  onClick={() => setMethod(p.value)}
-                >
-                  <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>{p.icon}</span>
-                  {payLabel(p.value)}
-                </button>
-              )}
-            </For>
-          </div>
+          <Show
+            when={!selectedCard()}
+            fallback={
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="chip-select is-active" aria-pressed="true">
+                  <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>north</span>
+                  {payLabel("CREDIT")}
+                </span>
+                <span class="meta">{t("addTransaction.lockedCredit")}</span>
+              </div>
+            }
+          >
+            <div class="flex flex-wrap gap-2">
+              <For each={PAYMENT_METHODS}>
+                {(p) => (
+                  <button
+                    type="button"
+                    class="chip-select"
+                    aria-pressed={method() === p.value}
+                    classList={{ "is-active": method() === p.value }}
+                    onClick={() => setMethod(p.value)}
+                  >
+                    <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>{p.icon}</span>
+                    {payLabel(p.value)}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
         </section>
 
         <section class="grid grid-cols-2 gap-3">
