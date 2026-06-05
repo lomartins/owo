@@ -67,6 +67,7 @@ export default function AddTransaction(): JSX.Element {
   const [categoryId, setCategoryId] = createSignal<string>("");
   const [method, setMethod] = createSignal<PaymentMethod>("PIX");
   const [installments, setInstallments] = createSignal(1);
+  const [instOpen, setInstOpen] = createSignal(false);
   const [paid, setPaid] = createSignal(true);
 
   // In expense mode the account selector may point at a card (value "card:<id>").
@@ -318,31 +319,63 @@ export default function AddTransaction(): JSX.Element {
               </select>
             </Show>
             <Show when={selectedCard()}>
-              <label class="mt-3 block">
+              <div class="mt-3">
                 <span class="label">{t("addTransaction.installments")}</span>
-                <div class="flex items-center gap-3">
+                <div class="relative">
                   <input
-                    class="field"
+                    class="field !pr-9"
                     type="number"
+                    inputmode="numeric"
                     min="1"
                     max="99"
-                    list="installments-options"
                     value={installments()}
+                    onFocus={() => setInstOpen(true)}
+                    onBlur={() => window.setTimeout(() => setInstOpen(false), 120)}
                     onInput={(e) => setInstallments(Math.max(1, Math.min(99, Number(e.currentTarget.value) || 1)))}
                   />
-                  <datalist id="installments-options">
-                    <For each={Array.from({ length: 24 }, (_, i) => i + 1)}>
-                      {(n) => <option value={n}>{n}×</option>}
-                    </For>
-                  </datalist>
-                  <Show when={installments() > 1 && amountCents() > 0n}>
-                    <span class="meta tabular whitespace-nowrap">
-                      {installments()}× {formatMoney(amountCents() / BigInt(installments()), currency(), locale())}
-                    </span>
+                  <span
+                    class="material-symbols-rounded pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-muted)]"
+                    style={{ "font-size": "20px" }}
+                  >
+                    expand_more
+                  </span>
+                  <Show when={instOpen()}>
+                    <ul class="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto card p-1 shadow-[var(--shadow-sheet)]">
+                      <For each={Array.from({ length: 12 }, (_, i) => i + 1)}>
+                        {(n) => (
+                          <li>
+                            <button
+                              type="button"
+                              class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left hover:bg-[color:var(--color-surface-muted)]"
+                              classList={{
+                                "!bg-[color:var(--color-primary-50)] text-[color:var(--color-primary-600)]": installments() === n,
+                              }}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setInstallments(n);
+                                setInstOpen(false);
+                              }}
+                            >
+                              <span class="body-strong">{n}×</span>
+                              <Show when={amountCents() > 0n}>
+                                <span class="meta tabular">
+                                  {formatMoney(amountCents() / BigInt(n), currency(), locale())}
+                                </span>
+                              </Show>
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
                   </Show>
                 </div>
+                <Show when={installments() > 1 && amountCents() > 0n}>
+                  <p class="meta tabular mt-1">
+                    {installments()}× {formatMoney(amountCents() / BigInt(installments()), currency(), locale())}
+                  </p>
+                </Show>
                 <p class="meta mt-1">{t("addTransaction.installmentsHint")}</p>
-              </label>
+              </div>
             </Show>
           </section>
         </Show>
