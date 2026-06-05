@@ -44,7 +44,7 @@ impl Modify for SecurityAddon {
         auth::change_password, auth::list_sessions, auth::revoke_session, auth::revoke_other_sessions,
         profile::upload_photo,
         accounts::list, accounts::create, accounts::show, accounts::update, accounts::delete, accounts::balance,
-        cards::list, cards::create,
+        cards::list, cards::create, cards::update, cards::delete, cards::invoice_preview,
         categories::list, categories::create, categories::update, categories::delete,
         tags::list, tags::create,
         transactions::list, transactions::create, transactions::update, transactions::delete, transactions::transfer,
@@ -53,7 +53,7 @@ impl Modify for SecurityAddon {
         loans::list, loans::create,
         budgets::list, budgets::create, budgets::update, budgets::delete,
         goals::list, goals::create,
-        reports::monthly, reports::cash_flow, reports::by_category, reports::net_worth,
+        reports::monthly, reports::cash_flow, reports::by_category, reports::net_worth, reports::spendable,
         sync::push, sync::pull,
         audit::list,
         backup::create, backup::status, backup::download, backup::restore,
@@ -69,6 +69,7 @@ impl Modify for SecurityAddon {
         crate::domain::account::Account, crate::domain::account::CreateAccount,
         crate::domain::account::UpdateAccount, crate::domain::account::AccountBalance,
         crate::domain::card::Card, crate::domain::card::CreateCard, crate::domain::card::CardInvoice,
+        crate::domain::card::UpdateCard, crate::domain::card::InvoicePreview, crate::domain::card::InvoicePreviewList,
         crate::domain::category::Category, crate::domain::category::CreateCategory,
         crate::domain::category::UpdateCategory,
         crate::domain::tag::Tag, crate::domain::tag::CreateTag,
@@ -85,6 +86,7 @@ impl Modify for SecurityAddon {
         crate::domain::goal::Goal, crate::domain::goal::CreateGoal,
         crate::api::reports::MonthlyReport,
         crate::api::reports::NetWorthReport, crate::api::reports::NetWorthPoint,
+        crate::api::reports::SpendableReport,
     )),
     tags(
         (name = "auth"), (name = "accounts"), (name = "cards"), (name = "categories"),
@@ -110,6 +112,8 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/accounts/:id/balance", get(accounts::balance))
         .route("/cards", get(cards::list).post(cards::create))
+        .route("/cards/invoice-preview", get(cards::invoice_preview))
+        .route("/cards/:id", patch(cards::update).delete(cards::delete))
         .route("/categories", get(categories::list).post(categories::create))
         .route("/categories/:id", patch(categories::update).delete(categories::delete))
         .route("/tags", get(tags::list).post(tags::create))
@@ -129,6 +133,7 @@ pub fn router(state: AppState) -> Router {
         .route("/reports/cash-flow", get(reports::cash_flow))
         .route("/reports/by-category", get(reports::by_category))
         .route("/reports/net-worth", get(reports::net_worth))
+        .route("/reports/spendable", get(reports::spendable))
         .route("/sync/push", post(sync::push))
         .route("/sync/pull", get(sync::pull))
         .route("/audit", get(audit::list))

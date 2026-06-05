@@ -18,10 +18,9 @@ export const PRIMARY_TABS: Tab[] = [
 export const SWIPE_TABS: readonly string[] = PRIMARY_TABS.map((t) => t.href);
 
 const MORE_TABS: Tab[] = [
-  { href: "/accounts",   labelKey: "nav.accounts",   icon: "account_balance_wallet" },
-  { href: "/budgets",    labelKey: "nav.budgets",    icon: "savings" },
-  { href: "/categories", labelKey: "nav.categories", icon: "sell" },
-  { href: "/profile",    labelKey: "profile.title",  icon: "person" },
+  { href: "/accounts", labelKey: "nav.accounts", icon: "account_balance_wallet" },
+  { href: "/settings", labelKey: "nav.settings", icon: "settings" },
+  { href: "/profile",  labelKey: "profile.title", icon: "person" },
 ];
 
 export function BottomNav(): JSX.Element {

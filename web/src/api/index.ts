@@ -6,12 +6,18 @@ import type {
   AuthResponse,
   Bill,
   BudgetMonth,
+  Card,
+  CreateCard,
+  UpdateCard,
+  InvoicePreview,
   Category,
   CreateBill,
   CreateBudget,
   CreateTransaction,
   MonthlyReport,
   PayBill,
+  SpendableReport,
+  UpdateAccount,
   UpdateBill,
   PhotoUploadResponse,
   ProfileUpdate,
@@ -51,9 +57,25 @@ export const auth = {
 
 // ---- accounts ----
 export const accounts = {
-  list: () => request<ListEnvelope<Account>>("/accounts").then((r) => r.items),
+  /** Pass `month` (YYYY-MM) for end-of-month balances; omit for as-of-today. */
+  list: (month?: string) =>
+    request<ListEnvelope<Account>>("/accounts", { query: month ? { month } : undefined }).then((r) => r.items),
   create: (body: { name: string; type: "asset"; currency: string; initial_balance?: string }) =>
     request<Account>("/accounts", { method: "POST", body }),
+  update: (id: string, body: UpdateAccount) =>
+    request<Account>(`/accounts/${id}`, { method: "PATCH", body }),
+  remove: (id: string) => request<void>(`/accounts/${id}`, { method: "DELETE" }),
+};
+
+// ---- cards ----
+export const cards = {
+  list: () => request<ListEnvelope<Card>>("/cards").then((r) => r.items),
+  create: (body: CreateCard) => request<Card>("/cards", { method: "POST", body }),
+  update: (id: string, body: UpdateCard) =>
+    request<Card>(`/cards/${id}`, { method: "PATCH", body }),
+  remove: (id: string) => request<void>(`/cards/${id}`, { method: "DELETE" }),
+  invoicePreview: () =>
+    request<ListEnvelope<InvoicePreview>>("/cards/invoice-preview").then((r) => r.items),
 };
 
 // ---- categories ----
@@ -83,7 +105,8 @@ export const transactions = {
   }) => request<Transaction>("/transactions/transfer", { method: "POST", body }),
   update: (id: string, body: UpdateTransaction) =>
     request<Transaction>(`/transactions/${id}`, { method: "PATCH", body }),
-  remove: (id: string) => request<void>(`/transactions/${id}`, { method: "DELETE" }),
+  remove: (id: string, scope?: "this" | "following") =>
+    request<void>(`/transactions/${id}`, { method: "DELETE", query: scope ? { scope } : undefined }),
 };
 
 // ---- budgets ----
@@ -100,6 +123,7 @@ export const reports = {
   monthly: (month: string) => request<MonthlyReport>("/reports/monthly", { query: { month } }),
   netWorth: (opts?: { to?: string; months?: number }) =>
     request<import("./types").NetWorthReport>("/reports/net-worth", { query: opts }),
+  spendable: (month: string) => request<SpendableReport>("/reports/spendable", { query: { month } }),
 };
 
 // ---- bills (Despesas fixas) ----

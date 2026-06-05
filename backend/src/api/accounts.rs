@@ -14,11 +14,55 @@ pub struct AccountList {
     pub items: Vec<Account>,
 }
 
-/// Balance = initial_balance + sum(incoming) - sum(outgoing).
+/// Balance = initial_balance + sum(incoming) - sum(outgoing), counted up to an
+/// exclusive cutoff date. `excl_sql` is a SQL date expression: `date('now','+1 day')`
+/// for "as of today", or a quoted `'YYYY-MM-01'` literal for end-of-month views.
 /// Subqueries are filtered on (source|destination)_account_id matching the row's id.
-const BALANCE_EXPR: &str = "a.initial_balance \
-    + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL), 0) \
-    - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL), 0)";
+/// initial_balance is now always 0 (opening value lives in a transaction), but it
+/// is kept in the formula for forward-compatibility.
+fn balance_expr(excl_sql: &str) -> String {
+    format!(
+        "a.initial_balance \
+         + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL AND tx_date < {e}), 0) \
+         - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL AND tx_date < {e}), 0)",
+        e = excl_sql
+    )
+}
+
+const TODAY_EXCL: &str = "date('now','+1 day')";
+
+/// Exclusive cutoff for "end of month `month` (YYYY-MM)": a quoted `'YYYY-MM-01'`
+/// literal for the first day of the FOLLOWING month. Validated server-side, so safe
+/// to inline.
+fn month_end_excl(month: &str) -> ApiResult<String> {
+    if month.len() != 7 || month.as_bytes()[4] != b'-' {
+        return Err(ApiError::Validation { field: "month".into(), reason: "expected YYYY-MM".into() });
+    }
+    let y: i32 = month[0..4].parse().map_err(|_| ApiError::Validation { field: "month".into(), reason: "invalid year".into() })?;
+    let mo: u32 = month[5..7].parse().map_err(|_| ApiError::Validation { field: "month".into(), reason: "invalid month".into() })?;
+    if !(1..=12).contains(&mo) {
+        return Err(ApiError::Validation { field: "month".into(), reason: "month must be 01..12".into() });
+    }
+    let (ny, nm) = if mo == 12 { (y + 1, 1) } else { (y, mo + 1) };
+    Ok(format!("'{:04}-{:02}-01'", ny, nm))
+}
+
+#[derive(Deserialize)]
+pub struct AccountQuery {
+    /// End-of-month basis (YYYY-MM). When omitted, balances are computed as of today.
+    pub month: Option<String>,
+}
+
+/// Signed value of the account's opening-balance transaction (the leg paired with
+/// the user's equity bucket). Positive = money started in the account.
+const OPENING_EXPR: &str = "COALESCE((\
+    SELECT CASE WHEN t.destination_account_id = a.id THEN t.value ELSE -t.value END \
+    FROM transactions t \
+    JOIN accounts e ON e.user_id = a.user_id AND e.type = 'equity' AND e.deleted_at IS NULL \
+    WHERE t.deleted_at IS NULL \
+      AND ((t.source_account_id = e.id AND t.destination_account_id = a.id) \
+        OR (t.source_account_id = a.id AND t.destination_account_id = e.id)) \
+    LIMIT 1), 0)";
 
 #[utoipa::path(
     get, path = "/api/v1/accounts", tag = "accounts",
@@ -28,16 +72,23 @@ const BALANCE_EXPR: &str = "a.initial_balance \
 pub async fn list(
     State(state): State<AppState>,
     Extension(cu): Extension<CurrentUser>,
+    Query(q): Query<AccountQuery>,
 ) -> ApiResult<Json<AccountList>> {
-    // Revenue and expense are accounting buckets; they never appear in the user-facing list.
+    let excl = match q.month {
+        Some(m) => month_end_excl(&m)?,
+        None => TODAY_EXCL.to_string(),
+    };
+    // revenue / expense / equity are accounting buckets; never in the user list.
     let sql = format!(
         "SELECT a.id, a.name, a.type, a.currency, a.initial_balance, \
+                {opening} AS opening_balance, \
                 {balance} AS current_balance, \
                 CAST(a.archived AS INTEGER) != 0 AS archived, a.created_at, a.updated_at \
          FROM accounts a \
-         WHERE a.user_id = ? AND a.deleted_at IS NULL AND a.type NOT IN ('revenue','expense') \
+         WHERE a.user_id = ? AND a.deleted_at IS NULL AND a.type NOT IN ('revenue','expense','equity') \
          ORDER BY a.created_at",
-        balance = BALANCE_EXPR
+        opening = OPENING_EXPR,
+        balance = balance_expr(&excl)
     );
     let items: Vec<Account> = sqlx::query_as(&sql)
         .bind(cu.id.to_string())
@@ -70,22 +121,26 @@ pub async fn create(
     let now = now_iso();
     let initial = req.initial_balance.unwrap_or(0);
     let mut tx = state.pool.begin().await?;
+    // initial_balance lives in the ledger as an opening transaction, so the column
+    // stays 0 and the value is fully editable later.
     sqlx::query(
         "INSERT INTO accounts (id, user_id, name, type, currency, initial_balance, created_at, updated_at, device_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)",
     )
     .bind(id.to_string())
     .bind(cu.id.to_string())
     .bind(&req.name)
     .bind(&req.r#type)
     .bind(&req.currency)
-    .bind(initial)
     .bind(&now)
     .bind(&now)
     .bind(&cu.device_id)
     .execute(&mut *tx)
     .await
     .map_err(map_constraint)?;
+    if initial != 0 {
+        set_opening_balance(&mut tx, cu.id, &id.to_string(), &req.currency, initial, &cu.device_id, &now).await?;
+    }
     audit::write(&mut *tx, cu.id, "Account", &id.to_string(), "CREATE", None, Some(&cu.device_id)).await?;
     tx.commit().await?;
     let acct = load(&state.pool, cu.id, id).await?;
@@ -123,20 +178,20 @@ pub async fn update(
     let if_match = headers.get("if-match").and_then(|h| h.to_str().ok());
     let now = now_iso();
     let mut tx = state.pool.begin().await?;
-    let existing: Option<(String, String)> = sqlx::query_as(
-        "SELECT updated_at, type FROM accounts WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+    let existing: Option<(String, String, String)> = sqlx::query_as(
+        "SELECT updated_at, type, currency FROM accounts WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
     )
     .bind(id.to_string())
     .bind(cu.id.to_string())
     .fetch_optional(&mut *tx)
     .await?;
-    let Some((current_ts, acct_type)) = existing else {
+    let Some((current_ts, acct_type, currency)) = existing else {
         return Err(ApiError::NotFound);
     };
-    if matches!(acct_type.as_str(), "revenue" | "expense") {
+    if matches!(acct_type.as_str(), "revenue" | "expense" | "equity") {
         return Err(ApiError::Validation {
             field: "type".into(),
-            reason: "bucket accounts (revenue/expense) cannot be modified".into(),
+            reason: "bucket accounts (revenue/expense/equity) cannot be modified".into(),
         });
     }
     if let Some(im) = if_match {
@@ -145,16 +200,22 @@ pub async fn update(
         }
     }
     sqlx::query(
-        "UPDATE accounts SET name = COALESCE(?, name), archived = COALESCE(?, archived), updated_at = ?, sync_version = sync_version + 1 \
+        "UPDATE accounts SET name = COALESCE(?, name), currency = COALESCE(?, currency), \
+            archived = COALESCE(?, archived), updated_at = ?, sync_version = sync_version + 1 \
          WHERE id = ? AND user_id = ?",
     )
     .bind(req.name)
+    .bind(req.currency.as_deref())
     .bind(req.archived.map(|b| if b { 1 } else { 0 }))
     .bind(&now)
     .bind(id.to_string())
     .bind(cu.id.to_string())
     .execute(&mut *tx)
     .await?;
+    if let Some(opening) = req.opening_balance {
+        let cur = req.currency.as_deref().unwrap_or(&currency);
+        set_opening_balance(&mut tx, cu.id, &id.to_string(), cur, opening, &cu.device_id, &now).await?;
+    }
     audit::write(&mut *tx, cu.id, "Account", &id.to_string(), "UPDATE", None, Some(&cu.device_id)).await?;
     tx.commit().await?;
     Ok(Json(load(&state.pool, cu.id, id).await?))
@@ -181,10 +242,10 @@ pub async fn delete(
     .fetch_optional(&mut *tx)
     .await?;
     if let Some((t,)) = existing {
-        if matches!(t.as_str(), "revenue" | "expense") {
+        if matches!(t.as_str(), "revenue" | "expense" | "equity") {
             return Err(ApiError::Validation {
                 field: "type".into(),
-                reason: "bucket accounts (revenue/expense) cannot be deleted".into(),
+                reason: "bucket accounts (revenue/expense/equity) cannot be deleted".into(),
             });
         }
     } else {
@@ -259,10 +320,12 @@ pub async fn balance(
 async fn load(pool: &sqlx::SqlitePool, user_id: Uuid, id: Uuid) -> ApiResult<Account> {
     let sql = format!(
         "SELECT a.id, a.name, a.type, a.currency, a.initial_balance, \
+                {opening} AS opening_balance, \
                 {balance} AS current_balance, \
                 CAST(a.archived AS INTEGER) != 0 AS archived, a.created_at, a.updated_at \
          FROM accounts a WHERE a.id = ? AND a.user_id = ? AND a.deleted_at IS NULL",
-        balance = BALANCE_EXPR
+        opening = OPENING_EXPR,
+        balance = balance_expr(TODAY_EXCL)
     );
     let row: Option<Account> = sqlx::query_as(&sql)
         .bind(id.to_string())
@@ -270,6 +333,126 @@ async fn load(pool: &sqlx::SqlitePool, user_id: Uuid, id: Uuid) -> ApiResult<Acc
         .fetch_optional(pool)
         .await?;
     row.ok_or(ApiError::NotFound)
+}
+
+/// Fetch the user's equity (opening-balance) bucket, self-healing by creating it
+/// when missing (e.g. accounts predating the equity migration).
+async fn equity_bucket(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: Uuid,
+    currency: &str,
+    device_id: &str,
+    now: &str,
+) -> ApiResult<String> {
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT id FROM accounts WHERE user_id = ? AND type = 'equity' AND deleted_at IS NULL",
+    )
+    .bind(user_id.to_string())
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some((id,)) = existing {
+        return Ok(id);
+    }
+    let id = new_id().to_string();
+    sqlx::query(
+        "INSERT INTO accounts (id, user_id, name, type, currency, initial_balance, archived, \
+            created_at, updated_at, device_id) \
+         VALUES (?, ?, 'Opening balance', 'equity', ?, 0, 0, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(user_id.to_string())
+    .bind(currency)
+    .bind(now)
+    .bind(now)
+    .bind(device_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(id)
+}
+
+/// Set an account's opening balance to `cents` (signed) by upserting the
+/// opening-balance transaction paired with the equity bucket. `cents == 0`
+/// removes the opening transaction.
+async fn set_opening_balance(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: Uuid,
+    account_id: &str,
+    currency: &str,
+    cents: i64,
+    device_id: &str,
+    now: &str,
+) -> ApiResult<()> {
+    let equity = equity_bucket(tx, user_id, currency, device_id, now).await?;
+
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT id FROM transactions \
+         WHERE user_id = ? AND deleted_at IS NULL \
+           AND ((source_account_id = ? AND destination_account_id = ?) \
+             OR (source_account_id = ? AND destination_account_id = ?)) \
+         LIMIT 1",
+    )
+    .bind(user_id.to_string())
+    .bind(&equity)
+    .bind(account_id)
+    .bind(account_id)
+    .bind(&equity)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    if cents == 0 {
+        if let Some((tx_id,)) = existing {
+            sqlx::query(
+                "UPDATE transactions SET deleted_at = ?, updated_at = ?, sync_version = sync_version + 1 WHERE id = ?",
+            )
+            .bind(now)
+            .bind(now)
+            .bind(&tx_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+        return Ok(());
+    }
+
+    let (src, dst, value) = if cents > 0 {
+        (equity.clone(), account_id.to_string(), cents)
+    } else {
+        (account_id.to_string(), equity.clone(), -cents)
+    };
+
+    if let Some((tx_id,)) = existing {
+        sqlx::query(
+            "UPDATE transactions SET source_account_id = ?, destination_account_id = ?, \
+                value = ?, updated_at = ?, sync_version = sync_version + 1 WHERE id = ?",
+        )
+        .bind(&src)
+        .bind(&dst)
+        .bind(value)
+        .bind(now)
+        .bind(&tx_id)
+        .execute(&mut **tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "INSERT INTO transactions \
+                (id, user_id, source_account_id, destination_account_id, category_id, \
+                 payment_method, value, currency, description, tx_date, paid, \
+                 created_at, updated_at, device_id) \
+             VALUES (?, ?, ?, ?, NULL, 'CASH', ?, ?, 'Opening balance', ?, 1, ?, ?, ?)",
+        )
+        .bind(new_id().to_string())
+        .bind(user_id.to_string())
+        .bind(&src)
+        .bind(&dst)
+        .bind(value)
+        .bind(currency)
+        .bind(&now[..10.min(now.len())])
+        .bind(now)
+        .bind(now)
+        .bind(device_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
 }
 
 fn map_constraint(e: sqlx::Error) -> ApiError {

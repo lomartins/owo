@@ -1,7 +1,7 @@
 import { createResource, createSignal, For, Show, type JSX } from "solid-js";
 import { useNavigate, A } from "@solidjs/router";
-import { accounts, categories, transactions } from "../api";
-import type { Account, Category, PaymentMethod } from "../api/types";
+import { accounts, cards, categories, transactions } from "../api";
+import type { Account, Card, Category, PaymentMethod } from "../api/types";
 import { today } from "../lib/month";
 import { centsToApi, inputToApi, parseCents, formatMoney } from "../lib/money";
 import { ApiError } from "../api/client";
@@ -41,6 +41,9 @@ export default function AddTransaction(): JSX.Element {
 
   const [accs] = createResource(() => accounts.list());
   const [cats] = createResource(() => categories.list());
+  const [crds] = createResource(() => cards.list());
+
+  const activeCards = (): Card[] => (crds() ?? []).filter((c) => !c.archived);
 
   const visibleCategories = (): Category[] => {
     const list = cats() ?? [];
@@ -63,7 +66,16 @@ export default function AddTransaction(): JSX.Element {
   const [destAccountId, setDestAccountId] = createSignal<string>("");
   const [categoryId, setCategoryId] = createSignal<string>("");
   const [method, setMethod] = createSignal<PaymentMethod>("PIX");
+  const [installments, setInstallments] = createSignal(1);
+  const [instOpen, setInstOpen] = createSignal(false);
   const [paid, setPaid] = createSignal(true);
+
+  // In expense mode the account selector may point at a card (value "card:<id>").
+  const selectedCard = (): Card | undefined => {
+    const v = accountId();
+    if (!v.startsWith("card:")) return undefined;
+    return activeCards().find((c) => c.id === v.slice(5));
+  };
   const [date, setDate] = createSignal(today());
   const [description, setDescription] = createSignal("");
 
@@ -122,18 +134,22 @@ export default function AddTransaction(): JSX.Element {
         });
         pushToast(t("addTransaction.transferSaved"), "ok");
       } else {
+        const card = mode() === "out" ? selectedCard() : undefined;
         const payload =
           mode() === "out"
-            ? { source_account_id: accountId(), category_id: categoryId() }
+            ? card
+              ? { source_account_id: card.account_id, category_id: categoryId(), card_id: card.id }
+              : { source_account_id: accountId(), category_id: categoryId() }
             : { destination_account_id: accountId(), category_id: categoryId() };
         await transactions.create({
           ...payload,
-          payment_method: method(),
+          payment_method: card ? "CREDIT" : method(),
           value: centsToApi(amountCents()),
           currency: currency(),
           description: description(),
           tx_date: date(),
           paid: paid(),
+          installments: card ? installments() : undefined,
         });
         pushToast(`${t("addTransaction.title")} ✓`, "ok");
       }
@@ -279,7 +295,7 @@ export default function AddTransaction(): JSX.Element {
           </section>
         }>
           <section>
-            <span class="label">{t("transactions.account")}</span>
+            <span class="label">{mode() === "out" ? t("addTransaction.payWith") : t("transactions.account")}</span>
             <Show when={assetAccounts().length > 0} fallback={<EmptyAccounts />}>
               <select class="field" value={accountId()} onChange={(e) => setAccountId(e.currentTarget.value)}>
                 <For each={assetAccounts()}>
@@ -289,29 +305,112 @@ export default function AddTransaction(): JSX.Element {
                     </option>
                   )}
                 </For>
+                <Show when={mode() === "out" && activeCards().length > 0}>
+                  <optgroup label={t("accounts.cards")}>
+                    <For each={activeCards()}>
+                      {(c) => (
+                        <option value={`card:${c.id}`}>
+                          {t("addTransaction.cardLabel")} · {c.brand} •••• {c.last_four_digits}
+                        </option>
+                      )}
+                    </For>
+                  </optgroup>
+                </Show>
               </select>
+            </Show>
+            <Show when={selectedCard()}>
+              <div class="mt-3">
+                <span class="label">{t("addTransaction.installments")}</span>
+                <div class="relative">
+                  <input
+                    class="field !pr-9"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="99"
+                    value={installments()}
+                    onFocus={() => setInstOpen(true)}
+                    onBlur={() => window.setTimeout(() => setInstOpen(false), 120)}
+                    onInput={(e) => setInstallments(Math.max(1, Math.min(99, Number(e.currentTarget.value) || 1)))}
+                  />
+                  <span
+                    class="material-symbols-rounded pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-muted)]"
+                    style={{ "font-size": "20px" }}
+                  >
+                    expand_more
+                  </span>
+                  <Show when={instOpen()}>
+                    <ul class="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto card p-1 shadow-[var(--shadow-sheet)]">
+                      <For each={Array.from({ length: 12 }, (_, i) => i + 1)}>
+                        {(n) => (
+                          <li>
+                            <button
+                              type="button"
+                              class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left hover:bg-[color:var(--color-surface-muted)]"
+                              classList={{
+                                "!bg-[color:var(--color-primary-50)] text-[color:var(--color-primary-600)]": installments() === n,
+                              }}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setInstallments(n);
+                                setInstOpen(false);
+                              }}
+                            >
+                              <span class="body-strong">{n}×</span>
+                              <Show when={amountCents() > 0n}>
+                                <span class="meta tabular">
+                                  {formatMoney(amountCents() / BigInt(n), currency(), locale())}
+                                </span>
+                              </Show>
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </div>
+                <Show when={installments() > 1 && amountCents() > 0n}>
+                  <p class="meta tabular mt-1">
+                    {installments()}× {formatMoney(amountCents() / BigInt(installments()), currency(), locale())}
+                  </p>
+                </Show>
+                <p class="meta mt-1">{t("addTransaction.installmentsHint")}</p>
+              </div>
             </Show>
           </section>
         </Show>
 
         <section>
           <span class="label">{t("addTransaction.paymentMethod")}</span>
-          <div class="flex flex-wrap gap-2">
-            <For each={PAYMENT_METHODS}>
-              {(p) => (
-                <button
-                  type="button"
-                  class="chip-select"
-                  aria-pressed={method() === p.value}
-                  classList={{ "is-active": method() === p.value }}
-                  onClick={() => setMethod(p.value)}
-                >
-                  <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>{p.icon}</span>
-                  {payLabel(p.value)}
-                </button>
-              )}
-            </For>
-          </div>
+          <Show
+            when={!selectedCard()}
+            fallback={
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="chip-select is-active" aria-pressed="true">
+                  <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>north</span>
+                  {payLabel("CREDIT")}
+                </span>
+                <span class="meta">{t("addTransaction.lockedCredit")}</span>
+              </div>
+            }
+          >
+            <div class="flex flex-wrap gap-2">
+              <For each={PAYMENT_METHODS}>
+                {(p) => (
+                  <button
+                    type="button"
+                    class="chip-select"
+                    aria-pressed={method() === p.value}
+                    classList={{ "is-active": method() === p.value }}
+                    onClick={() => setMethod(p.value)}
+                  >
+                    <span class="material-symbols-rounded" aria-hidden style={{ "font-size": "16px" }}>{p.icon}</span>
+                    {payLabel(p.value)}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
         </section>
 
         <section class="grid grid-cols-2 gap-3">

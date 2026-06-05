@@ -30,6 +30,7 @@ export default function Dashboard(): JSX.Element {
   const [report] = createResource(month, (m) => reports.monthly(m));
   const [budgetMonth] = createResource(month, (m) => budgets.list(m));
   const [cats] = createResource(() => categoriesApi.list());
+  const [spend] = createResource(month, (m) => reports.spendable(m).catch(() => null));
 
   const catById = (): Map<string, Category> => {
     const m = new Map<string, Category>();
@@ -50,6 +51,28 @@ export default function Dashboard(): JSX.Element {
       </Show>
 
       <NetWorthPanel />
+
+      <Show when={spend()}>
+        {(s) => (
+          <section class="card-tinted p-4 sm:p-5 enter">
+            <div class="flex items-baseline justify-between gap-3">
+              <span class="eyebrow">{t("dashboard.spendable")}</span>
+              <span class="meta">{t("dashboard.spendableHint")}</span>
+            </div>
+            <p
+              class="money-display tabular mt-1 text-[28px]"
+              classList={{ "money-overdue": parseCents(s().spendable) < 0n }}
+            >
+              {formatMoney(parseCents(s().spendable), currency(), locale())}
+            </p>
+            <div class="meta tabular mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              <span>{t("dashboard.spendAssets")}: {formatMoney(parseCents(s().asset_total), currency(), locale())}</span>
+              <span>− {t("dashboard.spendCards")}: {formatMoney(parseCents(s().card_outstanding), currency(), locale())}</span>
+              <span>− {t("dashboard.spendBills")}: {formatMoney(parseCents(s().pending_bills), currency(), locale())}</span>
+            </div>
+          </section>
+        )}
+      </Show>
 
       <section class="grid grid-cols-2 gap-3 stagger-enter">
         <Show

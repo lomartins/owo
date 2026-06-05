@@ -54,6 +54,13 @@ export default function TransactionsList(): JSX.Element {
 
   return (
     <div class="mx-auto w-full max-w-4xl space-y-4 px-4 py-5">
+      <header class="flex items-center justify-between gap-3">
+        <h2 class="h-title">{t("transactions.title")}</h2>
+        <A href="/add" class="btn btn-primary">
+          <span class="material-symbols-rounded" style={{ "font-size": "20px" }}>add</span>
+          {t("transactions.addCta")}
+        </A>
+      </header>
       <section class="flex flex-wrap gap-3">
         <label class="flex-1 min-w-[180px]">
           <span class="label">{t("transactions.account")}</span>
@@ -101,7 +108,7 @@ export default function TransactionsList(): JSX.Element {
                   <Row
                     tx={tx}
                     accountName={visibleAccountName(tx)}
-                    categoryName={tx.category_id ? localize(catMap().get(tx.category_id)?.name ?? "—") : t("transactions.transfer")}
+                    categoryName={tx.category_id ? localize(catMap().get(tx.category_id)?.name ?? "—") : tx.kind === "opening" ? t("transactions.opening") : t("transactions.transfer")}
                     currency={currency()}
                     locale={locale()}
                     pendingLabel={t("transactions.pending")}
@@ -142,7 +149,7 @@ function Row(props: {
 }): JSX.Element {
   const value = parseCents(props.tx.value);
   const kind = props.tx.kind;
-  const signed = kind === "withdrawal" ? -value : kind === "deposit" ? value : 0n;
+  const signed = kind === "withdrawal" ? -value : kind === "deposit" || kind === "opening" ? value : 0n;
   const sign = signed < 0n ? "−" : signed > 0n ? "+" : "";
   const amountAbs = signed < 0n ? -signed : signed === 0n ? value : signed;
 
@@ -264,9 +271,14 @@ function EditTransactionModal(props: {
 
   async function onDelete(): Promise<void> {
     if (!confirm(t("transactions.deleteConfirm"))) return;
+    let scope: "this" | "following" | undefined;
+    const count = tx.installment_count ?? 0;
+    if (tx.installment_group_id && count > 1) {
+      scope = confirm(t("transactions.deleteFollowingConfirm")) ? "following" : "this";
+    }
     setBusy(true);
     try {
-      await transactions.remove(tx.id);
+      await transactions.remove(tx.id, scope);
       pushToast(t("transactions.deleted"), "ok");
       props.onDone();
     } catch {

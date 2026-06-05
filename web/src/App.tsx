@@ -13,6 +13,7 @@ const Accounts = lazy(() => import("./routes/Accounts"));
 const Bills = lazy(() => import("./routes/Bills"));
 const Profile = lazy(() => import("./routes/Profile"));
 const CategoriesView = lazy(() => import("./routes/Categories"));
+const Settings = lazy(() => import("./routes/Settings"));
 
 export default function App(): JSX.Element {
   return (
@@ -29,6 +30,7 @@ export default function App(): JSX.Element {
             <Route path="/bills" component={Bills} />
             <Route path="/profile" component={Profile} />
             <Route path="/categories" component={CategoriesView} />
+            <Route path="/settings" component={Settings} />
           </Route>
           <Route path="*" component={Dashboard} />
         </Router>

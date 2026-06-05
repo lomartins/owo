@@ -54,8 +54,7 @@ export function AppHeader(props: Props): JSX.Element {
         <NavLink href="/bills" label={t("nav.bills")} />
         <NavLink href="/accounts" label={t("nav.accounts")} />
         <NavLink href="/add" label={t("nav.add")} emphasis />
-        <NavLink href="/budgets" label={t("nav.budgets")} />
-        <NavLink href="/categories" label={t("nav.categories")} />
+        <NavLink href="/settings" label={t("nav.settings")} />
       </nav>
     </header>
   );

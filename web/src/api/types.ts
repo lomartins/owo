@@ -2,7 +2,7 @@
 
 export type Decimal = string;
 
-export type AccountType = "asset" | "credit_card" | "liability" | "revenue" | "expense";
+export type AccountType = "asset" | "credit_card" | "liability" | "revenue" | "expense" | "equity";
 
 export interface Account {
   id: string;
@@ -10,10 +10,75 @@ export interface Account {
   type: AccountType;
   currency: string;
   initial_balance: Decimal;
+  /** Editable "initial value" — the signed value of the opening-balance transaction. */
+  opening_balance: Decimal;
   current_balance: Decimal;
   archived: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface UpdateAccount {
+  name?: string;
+  currency?: string;
+  archived?: boolean;
+  opening_balance?: Decimal;
+}
+
+export interface Card {
+  id: string;
+  /** The card's own credit_card ledger account (holds the debt). */
+  account_id: string;
+  /** The asset account this card is attached to / paid from. */
+  payment_account_id: string | null;
+  last_four_digits: string;
+  brand: string;
+  type: string;
+  limit: Decimal | null;
+  close_day: number | null;
+  due_day: number | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCard {
+  payment_account_id: string;
+  last_four_digits: string;
+  brand: string;
+  type: "CREDIT";
+  limit?: Decimal | null;
+  close_day?: number | null;
+  due_day?: number | null;
+}
+
+export interface UpdateCard {
+  payment_account_id?: string;
+  last_four_digits?: string;
+  brand?: string;
+  limit?: Decimal | null;
+  close_day?: number | null;
+  due_day?: number | null;
+  archived?: boolean;
+}
+
+export interface InvoicePreview {
+  card_id: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  accrued: Decimal;
+  cycle_total: Decimal;
+  outstanding: Decimal;
+  limit: Decimal | null;
+}
+
+export interface SpendableReport {
+  month: string;
+  asset_total: Decimal;
+  card_outstanding: Decimal;
+  pending_bills: Decimal;
+  spendable: Decimal;
 }
 
 export interface Category {
@@ -30,7 +95,7 @@ export interface Category {
 
 export type PaymentMethod = "PIX" | "CASH" | "BOLETO" | "VA" | "DEBIT" | "CREDIT" | "TED";
 
-export type TransactionKind = "deposit" | "withdrawal" | "transfer";
+export type TransactionKind = "deposit" | "withdrawal" | "transfer" | "opening";
 
 export interface Transaction {
   id: string;
@@ -49,6 +114,9 @@ export interface Transaction {
   card_id: string | null;
   bill_id: string | null;
   invoice_id: string | null;
+  installment_group_id: string | null;
+  installment_number: number | null;
+  installment_count: number | null;
   created_at: string;
   updated_at: string;
   kind: TransactionKind;
@@ -76,6 +144,9 @@ export interface CreateTransaction {
   description: string;
   tx_date: string;
   paid?: boolean;
+  card_id?: string | null;
+  /** > 1 splits a card purchase into monthly installments (parcelas). */
+  installments?: number;
 }
 
 export interface Bill {

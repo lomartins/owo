@@ -166,6 +166,84 @@ async fn balances_for_types_at(
     Ok(total)
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct SpendableReport {
+    pub month: String,
+    /// Sum of asset account balances right now.
+    #[serde(with = "crate::domain::common::cents_as_decimal")]
+    #[schema(value_type = String, example = "0.00")]
+    pub asset_total: i64,
+    /// Outstanding credit-card / liability debt (charges − payments), committed
+    /// but not yet drained from the asset accounts.
+    #[serde(with = "crate::domain::common::cents_as_decimal")]
+    #[schema(value_type = String, example = "0.00")]
+    pub card_outstanding: i64,
+    /// Unpaid bills due this month.
+    #[serde(with = "crate::domain::common::cents_as_decimal")]
+    #[schema(value_type = String, example = "0.00")]
+    pub pending_bills: i64,
+    /// asset_total − card_outstanding − pending_bills.
+    #[serde(with = "crate::domain::common::cents_as_decimal")]
+    #[schema(value_type = String, example = "0.00")]
+    pub spendable: i64,
+}
+
+#[derive(Deserialize)]
+pub struct SpendableQuery {
+    pub month: Option<String>,
+}
+
+/// "Money left to spend" simulation: real spendable money after treating credit
+/// card debt as already committed and subtracting this month's unpaid bills.
+#[utoipa::path(
+    get, path = "/api/v1/reports/spendable", tag = "reports",
+    security(("bearer" = [])),
+    params(("month" = Option<String>, Query, description = "YYYY-MM, defaults to current")),
+    responses((status = 200, body = SpendableReport))
+)]
+pub async fn spendable(
+    State(state): State<AppState>,
+    Extension(cu): Extension<CurrentUser>,
+    Query(q): Query<SpendableQuery>,
+) -> ApiResult<Json<SpendableReport>> {
+    let month = q.month.unwrap_or_else(|| chrono::Utc::now().format("%Y-%m").to_string());
+    if month.len() != 7 || month.as_bytes()[4] != b'-' {
+        return Err(ApiError::Validation { field: "month".into(), reason: "expected YYYY-MM".into() });
+    }
+    let uid = cu.id.to_string();
+    // End-of-selected-month basis: balances_for_types_at filters tx_date < bound, so
+    // pass the first day of the next month to include the whole selected month
+    // (e.g. a salary or bill scheduled later this month).
+    let month_excl = format!("{}-01", shift_month(&month, 1));
+
+    let asset_total = balances_for_types_at(&state.pool, &uid, &["asset"], &month_excl).await?;
+    // credit_card/liability balance is negative when in debt; outstanding is its magnitude.
+    let liab_balance = balances_for_types_at(&state.pool, &uid, &["credit_card", "liability"], &month_excl).await?;
+    let card_outstanding = (-liab_balance).max(0);
+
+    let (pending_bills,): (i64,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(COALESCE(o.value, b.value)), 0) \
+         FROM bills b \
+         LEFT JOIN bill_overrides o ON o.bill_id = b.id AND o.month = ? \
+         WHERE b.user_id = ? AND b.deleted_at IS NULL \
+           AND NOT EXISTS (SELECT 1 FROM bill_payments p WHERE p.bill_id = b.id AND p.month = ?)",
+    )
+    .bind(&month)
+    .bind(&uid)
+    .bind(&month)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let spendable = asset_total - card_outstanding - pending_bills;
+    Ok(Json(SpendableReport {
+        month,
+        asset_total,
+        card_outstanding,
+        pending_bills,
+        spendable,
+    }))
+}
+
 #[utoipa::path(get, path = "/api/v1/reports/cash-flow", tag = "reports", security(("bearer" = [])), responses((status = 501)))]
 pub async fn cash_flow(_state: State<AppState>, _cu: Extension<CurrentUser>) -> ApiResult<StatusCode> {
     Ok(StatusCode::NOT_IMPLEMENTED)
@@ -243,6 +321,8 @@ pub async fn net_worth(
         .collect();
     months_list.dedup();
 
+    // Each point is the end-of-that-month snapshot (exclusive boundary = first day of
+    // the next month), so the current month includes items scheduled later this month.
     let mut points: Vec<NetWorthPoint> = Vec::with_capacity(months_list.len());
     for m in &months_list {
         let next = shift_month(m, 1);
