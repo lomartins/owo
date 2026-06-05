@@ -326,10 +326,16 @@ export default function AddTransaction(): JSX.Element {
                     class="field"
                     type="number"
                     min="1"
-                    max="48"
+                    max="99"
+                    list="installments-options"
                     value={installments()}
-                    onInput={(e) => setInstallments(Math.max(1, Math.min(48, Number(e.currentTarget.value) || 1)))}
+                    onInput={(e) => setInstallments(Math.max(1, Math.min(99, Number(e.currentTarget.value) || 1)))}
                   />
+                  <datalist id="installments-options">
+                    <For each={Array.from({ length: 24 }, (_, i) => i + 1)}>
+                      {(n) => <option value={n}>{n}×</option>}
+                    </For>
+                  </datalist>
                   <Show when={installments() > 1 && amountCents() > 0n}>
                     <span class="meta tabular whitespace-nowrap">
                       {installments()}× {formatMoney(amountCents() / BigInt(installments()), currency(), locale())}
