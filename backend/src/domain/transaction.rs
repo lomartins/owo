@@ -25,9 +25,13 @@ pub struct Transaction {
     pub card_id: Option<String>,
     pub bill_id: Option<String>,
     pub invoice_id: Option<String>,
+    /// Set when this row is one installment of a multi-month card purchase.
+    pub installment_group_id: Option<String>,
+    pub installment_number: Option<i64>,
+    pub installment_count: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
-    /// Derived from source.type × destination.type: deposit | withdrawal | transfer.
+    /// Derived from source.type × destination.type: deposit | withdrawal | transfer | opening.
     pub kind: String,
 }
 
@@ -61,6 +65,11 @@ pub struct CreateTransaction {
     pub invoice_id: Option<String>,
     pub bill_id: Option<String>,
     pub tag_ids: Option<Vec<Uuid>>,
+    /// Number of monthly installments (parcelas) for a card purchase. When > 1 the
+    /// backend creates one transaction per month, all sharing an installment group;
+    /// `value` is the TOTAL and is split evenly (remainder on the first).
+    #[serde(default)]
+    pub installments: Option<u32>,
 }
 
 #[derive(Deserialize, ToSchema)]

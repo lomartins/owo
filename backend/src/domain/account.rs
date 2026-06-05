@@ -10,6 +10,12 @@ pub struct Account {
     #[serde(with = "crate::domain::common::cents_as_decimal")]
     #[schema(value_type = String, example = "0.00")]
     pub initial_balance: i64,
+    /// Signed value of the account's opening-balance transaction (equity leg).
+    /// This is the editable "initial value" surfaced to the user.
+    #[sqlx(default)]
+    #[serde(with = "crate::domain::common::cents_as_decimal")]
+    #[schema(value_type = String, example = "0.00")]
+    pub opening_balance: i64,
     #[sqlx(default)]
     #[serde(with = "crate::domain::common::cents_as_decimal")]
     #[schema(value_type = String, example = "0.00")]
@@ -32,7 +38,13 @@ pub struct CreateAccount {
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateAccount {
     pub name: Option<String>,
+    pub currency: Option<String>,
     pub archived: Option<bool>,
+    /// New signed opening balance (the "initial value"). Adjusts the account's
+    /// opening-balance transaction. Omit to leave it unchanged.
+    #[serde(default, with = "crate::domain::common::cents_as_decimal_opt")]
+    #[schema(value_type = Option<String>, example = "0.00")]
+    pub opening_balance: Option<i64>,
 }
 
 #[derive(Serialize, ToSchema)]

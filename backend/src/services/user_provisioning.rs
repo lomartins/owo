@@ -30,6 +30,7 @@ pub async fn provision_user(
     let now = now_iso();
     ensure_bucket(conn, user_id, "revenue", "Income", default_currency, device_id, &now).await?;
     ensure_bucket(conn, user_id, "expense", "Expense", default_currency, device_id, &now).await?;
+    ensure_bucket(conn, user_id, "equity", "Opening balance", default_currency, device_id, &now).await?;
     ensure_default_asset(conn, user_id, "Carteira", default_currency, device_id, &now).await?;
     ensure_seed_categories(conn, user_id, device_id, &now).await?;
     Ok(())

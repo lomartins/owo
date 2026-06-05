@@ -13,8 +13,11 @@ const TX_SELECT_COLS: &str = "id, source_account_id, destination_account_id, cat
                               value, currency, fx_rate, description, tx_date, \
                               CAST(paid AS INTEGER) != 0 AS paid, \
                               receipt_url, picture_url, card_id, bill_id, invoice_id, \
+                              installment_group_id, installment_number, installment_count, \
                               created_at, updated_at, \
                               (CASE \
+                                  WHEN (SELECT type FROM accounts WHERE id = source_account_id) = 'equity' \
+                                       OR (SELECT type FROM accounts WHERE id = destination_account_id) = 'equity' THEN 'opening' \
                                   WHEN (SELECT type FROM accounts WHERE id = source_account_id) = 'revenue' \
                                        AND (SELECT type FROM accounts WHERE id = destination_account_id) IN ('asset','credit_card') THEN 'deposit' \
                                   WHEN (SELECT type FROM accounts WHERE id = source_account_id) IN ('asset','credit_card') \
@@ -207,6 +210,8 @@ async fn leg_types(
 
 fn validate_leg_pair(src: &str, dst: &str, category_id: Option<&str>) -> ApiResult<()> {
     let derived = match (src, dst) {
+        ("equity", "asset" | "credit_card" | "liability")
+        | ("asset" | "credit_card" | "liability", "equity") => "opening",
         ("revenue", "asset" | "credit_card") => "deposit",
         ("asset" | "credit_card", "expense") => "withdrawal",
         (s, d)
@@ -223,10 +228,10 @@ fn validate_leg_pair(src: &str, dst: &str, category_id: Option<&str>) -> ApiResu
         }
     };
     let has_cat = category_id.map(|s| !s.is_empty()).unwrap_or(false);
-    if derived == "transfer" && has_cat {
+    if (derived == "transfer" || derived == "opening") && has_cat {
         return Err(ApiError::Validation {
             field: "category_id".into(),
-            reason: "transfers must not carry a category".into(),
+            reason: "transfers and opening balances must not carry a category".into(),
         });
     }
     if (derived == "withdrawal" || derived == "deposit") && !has_cat {
@@ -270,55 +275,80 @@ pub async fn create(
         leg_types(&state.pool, &cu.id.to_string(), &source_id, &destination_id).await?;
     validate_leg_pair(&s_type, &d_type, req.category_id.as_deref())?;
 
-    let id = new_id();
     let now = now_iso();
     let paid = req.paid.unwrap_or(true);
-    let mut tx = state.pool.begin().await?;
-    sqlx::query(
-        "INSERT INTO transactions \
-            (id, user_id, source_account_id, destination_account_id, category_id, \
-             payment_method, value, currency, fx_rate, description, tx_date, paid, \
-             card_id, bill_id, invoice_id, created_at, updated_at, device_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(id.to_string())
-    .bind(cu.id.to_string())
-    .bind(&source_id)
-    .bind(&destination_id)
-    .bind(req.category_id.as_deref())
-    .bind(&req.payment_method)
-    .bind(req.value)
-    .bind(&req.currency)
-    .bind(req.fx_rate.as_deref())
-    .bind(&req.description)
-    .bind(&req.tx_date)
-    .bind(paid as i64)
-    .bind(req.card_id.as_deref())
-    .bind(req.bill_id.as_deref())
-    .bind(req.invoice_id.as_deref())
-    .bind(&now)
-    .bind(&now)
-    .bind(&cu.device_id)
-    .execute(&mut *tx)
-    .await?;
+    let n = req.installments.unwrap_or(1).max(1);
+    let group_id: Option<String> = if n > 1 { Some(new_id().to_string()) } else { None };
+    let total = req.value;
+    let base = total / n as i64;
+    let remainder = total - base * n as i64; // goes on the first installment
 
-    if let Some(tag_ids) = req.tag_ids {
+    let mut tx = state.pool.begin().await?;
+    let mut first_id = String::new();
+    for k in 0..n {
+        let id = new_id().to_string();
+        if k == 0 {
+            first_id = id.clone();
+        }
+        let value = base + if k == 0 { remainder } else { 0 };
+        let date = if n > 1 { add_months_str(&req.tx_date, k as i32)? } else { req.tx_date.clone() };
+        let desc = if n > 1 {
+            format!("{} ({}/{})", req.description, k + 1, n)
+        } else {
+            req.description.clone()
+        };
+        let number: Option<i64> = if n > 1 { Some((k + 1) as i64) } else { None };
+        let count: Option<i64> = if n > 1 { Some(n as i64) } else { None };
+        sqlx::query(
+            "INSERT INTO transactions \
+                (id, user_id, source_account_id, destination_account_id, category_id, \
+                 payment_method, value, currency, fx_rate, description, tx_date, paid, \
+                 card_id, bill_id, invoice_id, installment_group_id, installment_number, \
+                 installment_count, created_at, updated_at, device_id) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(cu.id.to_string())
+        .bind(&source_id)
+        .bind(&destination_id)
+        .bind(req.category_id.as_deref())
+        .bind(&req.payment_method)
+        .bind(value)
+        .bind(&req.currency)
+        .bind(req.fx_rate.as_deref())
+        .bind(&desc)
+        .bind(&date)
+        .bind(paid as i64)
+        .bind(req.card_id.as_deref())
+        .bind(req.bill_id.as_deref())
+        .bind(req.invoice_id.as_deref())
+        .bind(group_id.as_deref())
+        .bind(number)
+        .bind(count)
+        .bind(&now)
+        .bind(&now)
+        .bind(&cu.device_id)
+        .execute(&mut *tx)
+        .await?;
+        crate::audit::write(&mut *tx, cu.id, "Transaction", &id, "CREATE", None, Some(&cu.device_id)).await?;
+    }
+
+    if let Some(tag_ids) = &req.tag_ids {
         for tid in tag_ids {
             sqlx::query("INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)")
-                .bind(id.to_string())
+                .bind(&first_id)
                 .bind(tid.to_string())
                 .execute(&mut *tx)
                 .await?;
         }
     }
-    crate::audit::write(&mut *tx, cu.id, "Transaction", &id.to_string(), "CREATE", None, Some(&cu.device_id)).await?;
     tx.commit().await?;
 
     let row: Transaction = sqlx::query_as(&format!(
         "SELECT {cols} FROM transactions WHERE id = ?",
         cols = TX_SELECT_COLS
     ))
-    .bind(id.to_string())
+    .bind(&first_id)
     .fetch_one(&state.pool)
     .await?;
     Ok((StatusCode::CREATED, Json(row)))
@@ -547,19 +577,63 @@ pub async fn update(
     Ok(Json(row))
 }
 
+#[derive(Deserialize)]
+pub struct DeleteQuery {
+    /// For installment transactions: "this" (default) deletes only this row,
+    /// "following" deletes this row and every later installment in the group.
+    pub scope: Option<String>,
+}
+
 #[utoipa::path(
     delete, path = "/api/v1/transactions/{id}", tag = "transactions",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path,)),
+    params(("id" = Uuid, Path,), ("scope" = Option<String>, Query, description = "this | following")),
     responses((status = 204))
 )]
 pub async fn delete(
     State(state): State<AppState>,
     Extension(cu): Extension<CurrentUser>,
     Path(id): Path<Uuid>,
+    Query(q): Query<DeleteQuery>,
 ) -> ApiResult<StatusCode> {
     let now = now_iso();
     let mut tx = state.pool.begin().await?;
+
+    let following = q.scope.as_deref() == Some("following");
+    if following {
+        // Resolve this row's installment group + position, then soft-delete it and
+        // every later installment in the same group.
+        let info: Option<(Option<String>, Option<i64>)> = sqlx::query_as(
+            "SELECT installment_group_id, installment_number FROM transactions \
+             WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+        )
+        .bind(id.to_string())
+        .bind(cu.id.to_string())
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some((group, number)) = info else {
+            return Err(ApiError::NotFound);
+        };
+        if let (Some(group), Some(number)) = (group, number) {
+            sqlx::query(
+                "UPDATE transactions SET deleted_at = ?, updated_at = ?, sync_version = sync_version + 1 \
+                 WHERE user_id = ? AND deleted_at IS NULL \
+                   AND installment_group_id = ? AND installment_number >= ?",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(cu.id.to_string())
+            .bind(&group)
+            .bind(number)
+            .execute(&mut *tx)
+            .await?;
+            crate::audit::write(&mut *tx, cu.id, "Transaction", &id.to_string(), "DELETE", None, Some(&cu.device_id)).await?;
+            tx.commit().await?;
+            return Ok(StatusCode::NO_CONTENT);
+        }
+        // Not an installment row → fall through to single-row delete.
+    }
+
     let res = sqlx::query(
         "UPDATE transactions SET deleted_at = ?, updated_at = ?, sync_version = sync_version + 1 \
          WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
@@ -576,4 +650,24 @@ pub async fn delete(
     crate::audit::write(&mut *tx, cu.id, "Transaction", &id.to_string(), "DELETE", None, Some(&cu.device_id)).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Add `n` months to a "YYYY-MM-DD" date string, clamping the day to month length.
+fn add_months_str(date: &str, n: i32) -> ApiResult<String> {
+    let d = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|_| ApiError::Validation {
+        field: "tx_date".into(),
+        reason: "expected YYYY-MM-DD".into(),
+    })?;
+    use chrono::Datelike;
+    let total = d.year() * 12 + d.month0() as i32 + n;
+    let y = total.div_euclid(12);
+    let m = total.rem_euclid(12) as u32 + 1;
+    let (ny, nm) = if m == 12 { (y + 1, 1) } else { (y, m + 1) };
+    let dim = chrono::NaiveDate::from_ymd_opt(ny, nm, 1)
+        .unwrap()
+        .pred_opt()
+        .unwrap()
+        .day();
+    let day = d.day().min(dim);
+    Ok(chrono::NaiveDate::from_ymd_opt(y, m, day).unwrap().to_string())
 }

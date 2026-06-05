@@ -9,6 +9,7 @@ owo.db
 owo.db-wal
 owo.db-shm
 uploads/
+.sandbox/
 
 # AI tool caches
 .cc-history/
