@@ -50,14 +50,12 @@ export function MonthSwitcher(props: Props): JSX.Element {
         </button>
       </div>
       <Show when={props.report}>
-        {(rep) => {
-          const f = formatSigned(flow(), props.currency ?? "BRL", props.locale ?? i18nLocale());
-          return (
-            <div class="eyebrow">
-              {t("month.carry_over")} · <span class="tabular">{f.text}</span>
-            </div>
-          );
-        }}
+        <div class="eyebrow">
+          {t("month.carry_over")} ·{" "}
+          <span class="tabular">
+            {formatSigned(flow(), props.currency ?? "BRL", props.locale ?? i18nLocale()).text}
+          </span>
+        </div>
       </Show>
     </div>
   );
