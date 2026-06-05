@@ -57,7 +57,9 @@ export const auth = {
 
 // ---- accounts ----
 export const accounts = {
-  list: () => request<ListEnvelope<Account>>("/accounts").then((r) => r.items),
+  /** Pass `month` (YYYY-MM) for end-of-month balances; omit for as-of-today. */
+  list: (month?: string) =>
+    request<ListEnvelope<Account>>("/accounts", { query: month ? { month } : undefined }).then((r) => r.items),
   create: (body: { name: string; type: "asset"; currency: string; initial_balance?: string }) =>
     request<Account>("/accounts", { method: "POST", body }),
   update: (id: string, body: UpdateAccount) =>

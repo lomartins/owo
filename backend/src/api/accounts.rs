@@ -14,15 +14,44 @@ pub struct AccountList {
     pub items: Vec<Account>,
 }
 
-/// Balance = initial_balance + sum(incoming) - sum(outgoing), counted only up to
-/// today. Future-dated transactions (e.g. an installment due next month) are
-/// "scheduled", not yet posted, so they don't affect the current balance.
+/// Balance = initial_balance + sum(incoming) - sum(outgoing), counted up to an
+/// exclusive cutoff date. `excl_sql` is a SQL date expression: `date('now','+1 day')`
+/// for "as of today", or a quoted `'YYYY-MM-01'` literal for end-of-month views.
 /// Subqueries are filtered on (source|destination)_account_id matching the row's id.
 /// initial_balance is now always 0 (opening value lives in a transaction), but it
 /// is kept in the formula for forward-compatibility.
-const BALANCE_EXPR: &str = "a.initial_balance \
-    + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL AND tx_date <= date('now')), 0) \
-    - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL AND tx_date <= date('now')), 0)";
+fn balance_expr(excl_sql: &str) -> String {
+    format!(
+        "a.initial_balance \
+         + COALESCE((SELECT SUM(value) FROM transactions WHERE destination_account_id = a.id AND deleted_at IS NULL AND tx_date < {e}), 0) \
+         - COALESCE((SELECT SUM(value) FROM transactions WHERE source_account_id      = a.id AND deleted_at IS NULL AND tx_date < {e}), 0)",
+        e = excl_sql
+    )
+}
+
+const TODAY_EXCL: &str = "date('now','+1 day')";
+
+/// Exclusive cutoff for "end of month `month` (YYYY-MM)": a quoted `'YYYY-MM-01'`
+/// literal for the first day of the FOLLOWING month. Validated server-side, so safe
+/// to inline.
+fn month_end_excl(month: &str) -> ApiResult<String> {
+    if month.len() != 7 || month.as_bytes()[4] != b'-' {
+        return Err(ApiError::Validation { field: "month".into(), reason: "expected YYYY-MM".into() });
+    }
+    let y: i32 = month[0..4].parse().map_err(|_| ApiError::Validation { field: "month".into(), reason: "invalid year".into() })?;
+    let mo: u32 = month[5..7].parse().map_err(|_| ApiError::Validation { field: "month".into(), reason: "invalid month".into() })?;
+    if !(1..=12).contains(&mo) {
+        return Err(ApiError::Validation { field: "month".into(), reason: "month must be 01..12".into() });
+    }
+    let (ny, nm) = if mo == 12 { (y + 1, 1) } else { (y, mo + 1) };
+    Ok(format!("'{:04}-{:02}-01'", ny, nm))
+}
+
+#[derive(Deserialize)]
+pub struct AccountQuery {
+    /// End-of-month basis (YYYY-MM). When omitted, balances are computed as of today.
+    pub month: Option<String>,
+}
 
 /// Signed value of the account's opening-balance transaction (the leg paired with
 /// the user's equity bucket). Positive = money started in the account.
@@ -43,7 +72,12 @@ const OPENING_EXPR: &str = "COALESCE((\
 pub async fn list(
     State(state): State<AppState>,
     Extension(cu): Extension<CurrentUser>,
+    Query(q): Query<AccountQuery>,
 ) -> ApiResult<Json<AccountList>> {
+    let excl = match q.month {
+        Some(m) => month_end_excl(&m)?,
+        None => TODAY_EXCL.to_string(),
+    };
     // revenue / expense / equity are accounting buckets; never in the user list.
     let sql = format!(
         "SELECT a.id, a.name, a.type, a.currency, a.initial_balance, \
@@ -54,7 +88,7 @@ pub async fn list(
          WHERE a.user_id = ? AND a.deleted_at IS NULL AND a.type NOT IN ('revenue','expense','equity') \
          ORDER BY a.created_at",
         opening = OPENING_EXPR,
-        balance = BALANCE_EXPR
+        balance = balance_expr(&excl)
     );
     let items: Vec<Account> = sqlx::query_as(&sql)
         .bind(cu.id.to_string())
@@ -291,7 +325,7 @@ async fn load(pool: &sqlx::SqlitePool, user_id: Uuid, id: Uuid) -> ApiResult<Acc
                 CAST(a.archived AS INTEGER) != 0 AS archived, a.created_at, a.updated_at \
          FROM accounts a WHERE a.id = ? AND a.user_id = ? AND a.deleted_at IS NULL",
         opening = OPENING_EXPR,
-        balance = BALANCE_EXPR
+        balance = balance_expr(TODAY_EXCL)
     );
     let row: Option<Account> = sqlx::query_as(&sql)
         .bind(id.to_string())

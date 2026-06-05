@@ -14,8 +14,8 @@ const BRANDS = ["VISA", "MASTERCARD", "ELO", "AMEX", "OTHER"];
 
 export default function AccountsView(): JSX.Element {
   const { t } = useI18n();
-  const { currency, locale } = useMonth();
-  const [list, { refetch }] = createResource(() => accounts.list());
+  const { month, currency, locale } = useMonth();
+  const [list, { refetch }] = createResource(month, (m) => accounts.list(m));
   const [cardList, { refetch: refetchCards }] = createResource(() => cards.list());
   const [previews, { refetch: refetchPreviews }] = createResource(() => cards.invoicePreview());
 
