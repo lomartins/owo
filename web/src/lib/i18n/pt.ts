@@ -163,6 +163,8 @@ export const pt: Dict = {
     hint: "Defina o quanto pretende gastar. A barra preenche conforme os gastos.",
     estimated: "Estimado",
     spent: "Gasto",
+    totalEstimated: "Total estimado",
+    totalSpent: "Total gasto",
     save: "Salvar",
     saved: "{{name}} salva",
     saveFailed: "Falha ao salvar",

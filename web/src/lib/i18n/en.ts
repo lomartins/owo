@@ -161,6 +161,8 @@ export const en = {
     hint: "Set what you intend to spend. The bar fills as you go.",
     estimated: "Estimated",
     spent: "Spent",
+    totalEstimated: "Total estimated",
+    totalSpent: "Total spent",
     save: "Save",
     saved: "Saved {{name}}",
     saveFailed: "Save failed",

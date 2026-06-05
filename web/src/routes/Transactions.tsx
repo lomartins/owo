@@ -12,7 +12,7 @@ import { localizeCategoryName, isSeedName } from "../lib/categories";
 import { ApiError } from "../api/client";
 import { pushToast } from "../components/Toast";
 
-const PAYMENT_METHODS: PaymentMethod[] = ["PIX", "CARD", "CASH", "BOLETO", "VA", "DEBIT", "CREDIT", "TED"];
+const PAYMENT_METHODS: PaymentMethod[] = ["PIX", "CASH", "BOLETO", "VA", "DEBIT", "CREDIT", "TED"];
 
 export default function TransactionsList(): JSX.Element {
   const { month, currency, locale, bumpRefresh } = useMonth();

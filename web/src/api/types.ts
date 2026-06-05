@@ -93,7 +93,7 @@ export interface Category {
   updated_at: string;
 }
 
-export type PaymentMethod = "PIX" | "CASH" | "BOLETO" | "CARD" | "VA" | "DEBIT" | "CREDIT" | "TED";
+export type PaymentMethod = "PIX" | "CASH" | "BOLETO" | "VA" | "DEBIT" | "CREDIT" | "TED";
 
 export type TransactionKind = "deposit" | "withdrawal" | "transfer" | "opening";
 

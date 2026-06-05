@@ -15,7 +15,6 @@ type Mode = "out" | "in" | "transfer";
 
 const PAYMENT_METHODS: { value: PaymentMethod; icon: string }[] = [
   { value: "PIX", icon: "bolt" },
-  { value: "CARD", icon: "credit_card" },
   { value: "CASH", icon: "payments" },
   { value: "BOLETO", icon: "receipt_long" },
   { value: "VA", icon: "lunch_dining" },
@@ -25,11 +24,11 @@ const PAYMENT_METHODS: { value: PaymentMethod; icon: string }[] = [
 ];
 
 const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  PIX: "PIX", CARD: "Card", CASH: "Cash", BOLETO: "Boleto",
+  PIX: "PIX", CASH: "Cash", BOLETO: "Boleto",
   VA: "VA", DEBIT: "Debit", CREDIT: "Credit", TED: "TED",
 };
 const PAYMENT_LABEL_PT: Record<PaymentMethod, string> = {
-  PIX: "PIX", CARD: "Cartão", CASH: "Dinheiro", BOLETO: "Boleto",
+  PIX: "PIX", CASH: "Dinheiro", BOLETO: "Boleto",
   VA: "VA", DEBIT: "Débito", CREDIT: "Crédito", TED: "TED",
 };
 
