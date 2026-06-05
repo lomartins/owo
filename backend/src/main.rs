@@ -9,8 +9,9 @@ async fn main() -> Result<()> {
         .init();
 
     let config = owo::config::Config::from_env()?;
+    // Migrations run on their own FK-disabled connection (see db::run_migrations).
+    owo::db::run_migrations(&config.database_url).await?;
     let pool = owo::db::pool(&config.database_url).await?;
-    sqlx::migrate!("./migrations/sqlite").run(&pool).await?;
 
     let state = owo::state::AppState::new(pool, config.clone());
     let app = owo::server::router(state);

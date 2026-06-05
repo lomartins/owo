@@ -15,6 +15,12 @@
 -- The accounts rewrite uses the create-new-with-temp-name → drop-old → rename
 -- pattern (see 0002) so no FK in cards/transactions/etc. is rewritten.
 
+-- The accounts table rewrite below drops + recreates `accounts`, which is
+-- referenced by FKs from cards/transactions/bills/etc. This is only safe with
+-- foreign-key enforcement OFF. `PRAGMA foreign_keys` is a no-op inside a
+-- transaction (and sqlx wraps each migration in one), so enforcement is disabled
+-- at the connection level by db::run_migrations before the transaction begins.
+-- The PRAGMA below is kept for parity with sibling migrations / direct sqlite3 use.
 PRAGMA foreign_keys = OFF;
 
 -- The 0007 triggers reference `accounts`; the table rewrite below briefly drops
