@@ -215,11 +215,14 @@ pub async fn update(
     match scope {
         "this_month" => {
             upsert_override(&mut *tx, &id.to_string(), &month, &req, &now).await?;
+            patch_month_transaction(&mut *tx, &id.to_string(), &cu.id.to_string(), &month, &req, &now).await?;
         }
         "this_and_next" => {
             upsert_override(&mut *tx, &id.to_string(), &month, &req, &now).await?;
+            patch_month_transaction(&mut *tx, &id.to_string(), &cu.id.to_string(), &month, &req, &now).await?;
             let next = shift_month_str(&month, 1)?;
             upsert_override(&mut *tx, &id.to_string(), &next, &req, &now).await?;
+            patch_month_transaction(&mut *tx, &id.to_string(), &cu.id.to_string(), &next, &req, &now).await?;
         }
         "all" => {
             // Patch the template.
@@ -335,10 +338,20 @@ pub async fn pay(
     let month = q.month.unwrap_or_else(current_month);
     validate_month(&month)?;
 
+    // Honor any per-month override (variable bills, e.g. electricity) so the
+    // payment transaction uses this month's adjusted value/description/category.
     let bill: Option<(String, Option<String>, String, i64, String, i64)> = sqlx::query_as(
-        "SELECT account_id, category_id, description, value, currency, due_day \
-         FROM bills WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+        "SELECT COALESCE(o.account_id, b.account_id), \
+                COALESCE(o.category_id, b.category_id), \
+                COALESCE(o.description, b.description), \
+                COALESCE(o.value, b.value), \
+                b.currency, \
+                COALESCE(o.due_day, b.due_day) \
+         FROM bills b \
+         LEFT JOIN bill_overrides o ON o.bill_id = b.id AND o.month = ? \
+         WHERE b.id = ? AND b.user_id = ? AND b.deleted_at IS NULL",
     )
+    .bind(&month)
     .bind(id.to_string())
     .bind(cu.id.to_string())
     .fetch_optional(&state.pool)
@@ -433,13 +446,10 @@ pub async fn pay(
     crate::audit::write(&mut *tx, cu.id, "Bill", &id.to_string(), "UPDATE", None, Some(&cu.device_id)).await?;
     tx.commit().await?;
 
-    let row: crate::domain::transaction::Transaction = sqlx::query_as(
-        "SELECT id, source_account_id, destination_account_id, category_id, payment_method, \
-                value, currency, fx_rate, description, tx_date, \
-                CAST(paid AS INTEGER) != 0 AS paid, \
-                receipt_url, picture_url, card_id, bill_id, invoice_id, created_at, updated_at \
-         FROM transactions WHERE id = ?",
-    )
+    let row: crate::domain::transaction::Transaction = sqlx::query_as(&format!(
+        "SELECT {} FROM transactions WHERE id = ?",
+        crate::api::transactions::TX_SELECT_COLS
+    ))
     .bind(&tx_id)
     .fetch_one(&state.pool)
     .await?;
@@ -544,6 +554,51 @@ fn shift_month_str(m: &str, delta: i32) -> ApiResult<String> {
 
 /// Upsert a single bill_overrides row. Only sets fields the caller provided
 /// (NULL means inherit from template at read time).
+/// If the given month already has a recorded payment (and thus a linked
+/// transaction), patch that transaction to match the per-month edit. Without
+/// this, a `this_month` / `this_and_next` edit would only move the displayed
+/// bill amount (via the override) while the real transaction — which feeds
+/// spent totals, net worth, etc. — kept the old value. No-op when the month
+/// is unpaid; the override alone (plus pay() honoring it) covers that case.
+async fn patch_month_transaction(
+    conn: &mut sqlx::SqliteConnection,
+    bill_id: &str,
+    user_id: &str,
+    month: &str,
+    req: &UpdateBill,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let pay: Option<(Option<String>,)> = sqlx::query_as(
+        "SELECT transaction_id FROM bill_payments WHERE bill_id = ? AND month = ? AND user_id = ?",
+    )
+    .bind(bill_id)
+    .bind(month)
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some((Some(tx_id),)) = pay else {
+        return Ok(());
+    };
+
+    sqlx::query(
+        "UPDATE transactions SET \
+            description = COALESCE(?, description), \
+            value       = COALESCE(?, value), \
+            category_id = COALESCE(?, category_id), \
+            updated_at  = ?, sync_version = sync_version + 1 \
+         WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+    )
+    .bind(req.description.as_deref())
+    .bind(req.value)
+    .bind(req.category_id.as_deref())
+    .bind(now)
+    .bind(&tx_id)
+    .bind(user_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 async fn upsert_override(
     conn: &mut sqlx::SqliteConnection,
     bill_id: &str,

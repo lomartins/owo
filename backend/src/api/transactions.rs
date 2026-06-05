@@ -9,7 +9,7 @@ use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-const TX_SELECT_COLS: &str = "id, source_account_id, destination_account_id, category_id, payment_method, \
+pub(crate) const TX_SELECT_COLS: &str = "id, source_account_id, destination_account_id, category_id, payment_method, \
                               value, currency, fx_rate, description, tx_date, \
                               CAST(paid AS INTEGER) != 0 AS paid, \
                               receipt_url, picture_url, card_id, bill_id, invoice_id, \

@@ -37,6 +37,26 @@ export default function BudgetEditor(): JSX.Element {
               />
             }
           >
+            {(() => {
+              const totalEstimated = d().items.reduce((s, r) => s + parseCents(r.estimated), 0n);
+              const totalSpent = d().items.reduce((s, r) => s + parseCents(r.spent), 0n);
+              return (
+                <div class="card mb-3 grid grid-cols-2 divide-x divide-[color:var(--color-surface-sunken)]">
+                  <div class="flex flex-col gap-1 p-4">
+                    <span class="eyebrow">{t("budgets.totalEstimated")}</span>
+                    <span class="money tabular text-[22px]">
+                      {formatMoney(totalEstimated, currency(), locale())}
+                    </span>
+                  </div>
+                  <div class="flex flex-col gap-1 p-4">
+                    <span class="eyebrow">{t("budgets.totalSpent")}</span>
+                    <span class="money tabular text-[22px]">
+                      {formatMoney(totalSpent, currency(), locale())}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
             <ul class="card divide-y divide-[color:var(--color-bone-200)]">
               <For each={d().items}>
                 {(row) => (
